@@ -1,13 +1,12 @@
 import { TILE_SIZE } from './world.js';
 import { TILE, isSolid, isDrillable, isOre, ORE_BY_ID, tileHardness, tileDrillTier } from './ores.js';
+import { UPGRADES } from './upgrades.js';
 
 const GRAVITY = 900;          // px/s^2
-const THRUST = 1500;          // px/s^2 upward when W held
 const MAX_FALL = 900;         // terminal velocity
 const MAX_RISE = 520;
 const LATERAL_ACCEL = 1500;
 const LATERAL_AIR_ACCEL = 1100;
-const LATERAL_MAX = 240;
 const GROUND_FRICTION = 1800; // px/s^2 deceleration when no input
 const AIR_DRAG = 200;
 
@@ -21,8 +20,6 @@ const HITBOX_W = 28;
 const HITBOX_H = 28;
 
 const DRILL_BASE_RATE = 1.0; // units/sec; tile takes hardness seconds at base
-const STARTER_DRILL_TIER = 1;
-const STARTER_DRILL_POWER = 1.0;
 
 export class Digger {
   constructor(world, spawn) {
@@ -38,14 +35,20 @@ export class Digger {
     this.facing = 1; // 1 = right, -1 = left
     this.onGround = false;
 
-    // Stats / attachments (MVP starter values; future shop will tune these).
-    this.maxFuel = 200;
+    // Attachments: each points at a tier object from upgrades.js.
+    // Future shop will mutate these references to higher tiers.
+    this.attachments = {
+      drill:    UPGRADES.drill[0],
+      fuelTank: UPGRADES.fuelTank[0],
+      hull:     UPGRADES.hull[0],
+      thermal:  UPGRADES.thermal[0],
+      storage:  UPGRADES.storage[0],
+      engine:   UPGRADES.engine[0],
+      radar:    UPGRADES.radar[0],
+    };
+    this._applyAttachmentStats();
     this.fuel = this.maxFuel;
-    this.maxHull = 100;
     this.hull = this.maxHull;
-    this.maxCargo = 25;
-    this.drillTier = STARTER_DRILL_TIER;
-    this.drillPower = STARTER_DRILL_POWER;
 
     // cargo: Map<oreKey, count>
     this.cargo = new Map();
@@ -108,7 +111,7 @@ export class Digger {
     // ---- Vertical: gravity + thrust ----
     this.thrusting = false;
     if (up && this.fuel > 0) {
-      this.vy -= THRUST * dt;
+      this.vy -= this.thrust * dt;
       this.thrusting = true;
       this.fuel = Math.max(0, this.fuel - FUEL_THRUST_RATE * dt);
     } else {
@@ -130,7 +133,7 @@ export class Digger {
       if (this.vx > 0) this.vx = Math.max(0, this.vx - fric * dt);
       else if (this.vx < 0) this.vx = Math.min(0, this.vx + fric * dt);
     }
-    this.vx = Math.max(-LATERAL_MAX, Math.min(LATERAL_MAX, this.vx));
+    this.vx = Math.max(-this.lateralMax, Math.min(this.lateralMax, this.vx));
 
     // ---- Drilling: pick a target if input asks for it ----
     this._updateDrillTarget(left, right, down);
@@ -160,7 +163,29 @@ export class Digger {
   }
 
   _takeDamage(amount) {
-    this.hull = Math.max(0, this.hull - amount);
+    const reduction = this.attachments.thermal?.reduction ?? 0;
+    this.hull = Math.max(0, this.hull - amount * (1 - reduction));
+  }
+
+  // Recompute derived caps/stats from currently equipped attachments.
+  // Call after swapping any attachment in `this.attachments`.
+  _applyAttachmentStats() {
+    this.maxFuel = this.attachments.fuelTank.capacity;
+    this.maxHull = this.attachments.hull.hp;
+    this.maxCargo = this.attachments.storage.capacity;
+    this.drillTier = this.attachments.drill.drillTier;
+    this.drillPower = this.attachments.drill.power;
+    this.thrust = this.attachments.engine.thrust;
+    this.lateralMax = this.attachments.engine.lateralMax;
+    if (this.fuel > this.maxFuel) this.fuel = this.maxFuel;
+    if (this.hull > this.maxHull) this.hull = this.maxHull;
+  }
+
+  // Refuel by `units`. Returns the actual amount added (clamped to capacity).
+  addFuel(units) {
+    const before = this.fuel;
+    this.fuel = Math.min(this.maxFuel, this.fuel + units);
+    return this.fuel - before;
   }
 
   _die(reason) {
