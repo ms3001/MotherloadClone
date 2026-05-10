@@ -238,6 +238,12 @@ export class Digger {
       return;
     }
 
+    if (!this.onGround) {
+      this.drillTarget = null;
+      this.drillProgress = 0;
+      return;
+    }
+
     // Priority: down > sideways (in input direction).
     let dir = null;
     if (down) dir = 'down';

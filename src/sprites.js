@@ -84,12 +84,19 @@ function drawSpawnFlag(ctx) {
 }
 
 function drawConcrete(ctx) {
-  noisyFill(ctx, '#5a5e66', '#3e4249', '#7e848f', 8888);
-  // horizontal groove lines
-  rect(ctx, 0, 5, 16, 1, '#3e4249');
-  rect(ctx, 0, 11, 16, 1, '#3e4249');
-  // top highlight edge
-  rect(ctx, 0, 0, 16, 1, '#7e848f');
+  // Dirt fill for the lower portion
+  noisyFill(ctx, '#7a4a2b', '#5a3520', '#956038', 12346);
+  rect(ctx, 3, 9,  2, 1, '#3f2515');
+  rect(ctx, 9, 13, 2, 1, '#3f2515');
+  rect(ctx, 12, 7, 1, 1, '#3f2515');
+
+  // Clean concrete slab on top (rows 0–4)
+  rect(ctx, 0, 0, 16, 5, '#8a8e96');
+  rect(ctx, 0, 0, 16, 1, '#c0c4cc');  // top highlight
+  rect(ctx, 0, 4, 16, 1, '#5a5e66');  // bottom shadow
+  // slab seam lines
+  rect(ctx, 0, 2,  5, 1, '#7a7e88');
+  rect(ctx, 7, 2,  5, 1, '#7a7e88');
 }
 
 function drawSky(ctx) {

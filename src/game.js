@@ -240,15 +240,6 @@ export class Game {
         if (prog > 0) {
           ctx.fillStyle = `rgba(0, 0, 0, ${0.25 + prog * 0.4})`;
           ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
-          // crack lines
-          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(sx + 4, sy + 4);
-          ctx.lineTo(sx + TILE_SIZE - 6, sy + TILE_SIZE - 8);
-          ctx.moveTo(sx + TILE_SIZE - 6, sy + 5);
-          ctx.lineTo(sx + 8, sy + TILE_SIZE - 4);
-          ctx.stroke();
         }
       }
     }
