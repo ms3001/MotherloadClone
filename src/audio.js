@@ -2,6 +2,18 @@ export class AudioManager {
   constructor() {
     this._ctx = null;
     this._sounds = {
+      roll: (ctx, t) => {
+        // Low ground rumble
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(80, t);
+        osc.frequency.exponentialRampToValueAtTime(52, t + 0.10);
+        gain.gain.setValueAtTime(0.09, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.12);
+      },
       construct: (ctx, t) => {
         // Metallic hammer clang: square body + sine ring
         const o1 = ctx.createOscillator();

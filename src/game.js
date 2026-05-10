@@ -212,6 +212,7 @@ export class Game {
       this.explosionTimer = this.explosionDuration;
     }
 
+    this._updateMovementSounds(dt);
     this._updateRefuel(dt);
     this._updateOreDepot(dt);
     this._updateRepairShop(dt);
@@ -291,6 +292,21 @@ export class Game {
       w: gs.w * TILE_SIZE,
       h: gs.h * TILE_SIZE,
     };
+  }
+
+  _updateMovementSounds(dt) {
+    const d = this.digger;
+    if (d.dead) return;
+
+    if (d.onGround && Math.abs(d.vx) > 30) {
+      this._rollSoundTimer = (this._rollSoundTimer ?? 0) - dt;
+      if (this._rollSoundTimer <= 0) {
+        this.audio.play('roll');
+        this._rollSoundTimer = 0.12;
+      }
+    } else {
+      this._rollSoundTimer = 0;
+    }
   }
 
   _updateRefuel(dt) {
