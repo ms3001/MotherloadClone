@@ -64,10 +64,11 @@ export class Digger {
     this.drilling = false;   // true this frame
     this.thrusting = false;  // true this frame
 
-    // Visual drill nudge (pixels, render-only)
-    this.drillNudgeX = 0;
-    this.drillNudgeY = 0;
     this.snapTargetX = null;
+    this._drillStartX = 0;
+    this._drillStartY = 0;
+    this._drillTargetX = 0;
+    this._drillTargetY = 0;
 
     // Animation
     this.animTime = 0;
@@ -96,8 +97,6 @@ export class Digger {
     this.cargoUsed = 0;
     this.drillTarget = null;
     this.drillProgress = 0;
-    this.drillNudgeX = 0;
-    this.drillNudgeY = 0;
     this.snapTargetX = null;
     this.deathReason = reason;
     this.dead = false;
@@ -123,11 +122,11 @@ export class Digger {
 
     // ---- Vertical: gravity + thrust ----
     this.thrusting = false;
-    if (up && this.fuel > 0) {
+    if (up && this.fuel > 0 && !this.drillTarget) {
       this.vy -= this.thrust * dt;
       this.thrusting = true;
       this.fuel = Math.max(0, this.fuel - FUEL_THRUST_RATE * dt);
-    } else if (hovering) {
+    } else if (hovering && !this.drillTarget) {
       this.thrusting = true;
       this.fuel = Math.max(0, this.fuel - FUEL_HOVER_RATE * dt);
     } else {
@@ -169,26 +168,6 @@ export class Digger {
         this.x += diff * Math.min(1, 12 * dt);
       }
     }
-
-    // ---- Drill nudge (visual only) ----
-    // Default: hold current nudge. Only commit to a target when actively
-    // progressing a tile, and only return to 0 when not drilling at all.
-    // This prevents the sprite from dipping between consecutive tiles.
-    const MAX_NUDGE = 5;
-    let targetNudgeX = this.drillNudgeX;
-    let targetNudgeY = this.drillNudgeY;
-    if (this.drillTarget && this.drillProgress > 0) {
-      const d = this.drillTarget.dir;
-      if (d === 'down')  targetNudgeY =  MAX_NUDGE;
-      else if (d === 'right') targetNudgeX =  MAX_NUDGE;
-      else if (d === 'left')  targetNudgeX = -MAX_NUDGE;
-    } else if (!this.drilling) {
-      targetNudgeX = 0;
-      targetNudgeY = 0;
-    }
-    const nudgeSpeed = targetNudgeX !== 0 || targetNudgeY !== 0 ? 40 : 20;
-    this.drillNudgeX += (targetNudgeX - this.drillNudgeX) * Math.min(1, nudgeSpeed * dt);
-    this.drillNudgeY += (targetNudgeY - this.drillNudgeY) * Math.min(1, nudgeSpeed * dt);
 
     // ---- Move with collision (axis-separated) ----
     const prevVy = this.vy;
@@ -302,6 +281,15 @@ export class Digger {
         this.drillTarget.dir !== dir) {
       this.drillTarget = { ...target, dir };
       this.drillProgress = 0;
+      this._drillStartX = this.x;
+      this._drillStartY = this.y;
+      if (dir === 'down') {
+        this._drillTargetX = target.tx * TILE_SIZE + TILE_SIZE / 2;
+        this._drillTargetY = this.y + TILE_SIZE;
+      } else {
+        this._drillTargetX = target.tx * TILE_SIZE + TILE_SIZE / 2;
+        this._drillTargetY = this.y;
+      }
     }
 
     this.drilling = true;
@@ -321,35 +309,12 @@ export class Digger {
       if (tileTop - (b.y + b.h) > FACE_TOL) return null;
       ty = cellY;
 
-      const centerTx = Math.floor(this.x / TILE_SIZE);
-      // Allow multi-column only when the center is within 6/100 of a tile width from a boundary
-      const offsetInTile = this.x - centerTx * TILE_SIZE;
-      const DUAL_THRESHOLD = TILE_SIZE * 6 / 100;
-      const nearBoundary = offsetInTile < DUAL_THRESHOLD || offsetInTile > TILE_SIZE - DUAL_THRESHOLD;
+      tx = Math.floor(this.x / TILE_SIZE);
+      if (!w.inBounds(tx, ty)) return null;
+      const t = w.get(tx, ty);
+      if (!isDrillable(t) || tileDrillTier(t) > this.drillTier) return null;
 
-      let candidates;
-      if (nearBoundary) {
-        const minTx = Math.floor(b.x / TILE_SIZE);
-        const maxTx = Math.floor((b.x + b.w - 0.001) / TILE_SIZE);
-        candidates = [...new Set([centerTx, minTx, maxTx])];
-      } else {
-        candidates = [centerTx];
-      }
-
-      tx = null;
-      for (const cx of candidates) {
-        if (!w.inBounds(cx, ty)) continue;
-        const t = w.get(cx, ty);
-        if (isDrillable(t) && tileDrillTier(t) <= this.drillTier) {
-          tx = cx;
-          break;
-        }
-      }
-      if (tx === null) return null;
-
-      // Single-column drills snap the digger to tile center after breaking
-      const snapX = nearBoundary ? null : tx * TILE_SIZE + TILE_SIZE / 2;
-      return { tx, ty, snapX };
+      return { tx, ty, snapX: tx * TILE_SIZE + TILE_SIZE / 2 };
     } else if (dir === 'right') {
       const cellX = Math.floor((b.x + b.w + 0.5) / TILE_SIZE);
       const tileLeft = cellX * TILE_SIZE;
@@ -377,7 +342,7 @@ export class Digger {
     if (!this.drilling || !this.drillTarget) return;
     if (this.fuel <= 0) return;
 
-    const { tx, ty } = this.drillTarget;
+    const { tx, ty, dir } = this.drillTarget;
     const tile = this.world.get(tx, ty);
     if (!isDrillable(tile)) {
       this.drillTarget = null;
@@ -385,32 +350,25 @@ export class Digger {
       return;
     }
 
-    const required = tileHardness(tile); // seconds at base rate
-    const rate = DRILL_BASE_RATE * this.drillPower; // multiplier
+    const required = tileHardness(tile);
+    const rate = DRILL_BASE_RATE * this.drillPower;
     this.drillProgress += rate * dt;
     this.world.setProgress(tx, ty, this.drillProgress / required);
-
     this.fuel = Math.max(0, this.fuel - FUEL_DRILL_RATE * dt);
 
+    // Drill-through: physically advance the digger into the target tile.
+    const frac = Math.min(1, this.drillProgress / required);
+    this.x = this._drillStartX + frac * (this._drillTargetX - this._drillStartX);
+    this.y = this._drillStartY + frac * (this._drillTargetY - this._drillStartY);
+    this.vx = 0;
+    this.vy = 0;
+
     if (this.drillProgress >= required) {
-      let snapX = this.drillTarget.snapX ?? null;
+      this.x = this._drillTargetX;
+      this.y = this._drillTargetY;
       this._breakTile(tx, ty, tile);
       this.drillTarget = null;
       this.drillProgress = 0;
-
-      // Suppress snap when the bbox overlaps an adjacent solid tile at the
-      // same row — snapping toward the now-empty hole would yank the player
-      // away from the tile they still need to drill next to it.
-      if (snapX !== null) {
-        const b = this.bbox;
-        const minTx = Math.floor(b.x / TILE_SIZE);
-        const maxTx = Math.floor((b.x + b.w - 0.001) / TILE_SIZE);
-        if (minTx !== maxTx) {
-          const adjTx = tx === minTx ? maxTx : minTx;
-          if (isSolid(this.world.get(adjTx, ty))) snapX = null;
-        }
-      }
-      if (snapX !== null) this.snapTargetX = snapX;
     }
   }
 

@@ -2,6 +2,26 @@ export class AudioManager {
   constructor() {
     this._ctx = null;
     this._sounds = {
+      construct: (ctx, t) => {
+        // Metallic hammer clang: square body + sine ring
+        const o1 = ctx.createOscillator();
+        const g1 = ctx.createGain();
+        o1.type = 'square';
+        o1.frequency.value = 420;
+        g1.gain.setValueAtTime(0.18, t);
+        g1.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+        o1.connect(g1); g1.connect(ctx.destination);
+        o1.start(t); o1.stop(t + 0.14);
+
+        const o2 = ctx.createOscillator();
+        const g2 = ctx.createGain();
+        o2.type = 'sine';
+        o2.frequency.value = 860;
+        g2.gain.setValueAtTime(0.10, t);
+        g2.gain.exponentialRampToValueAtTime(0.001, t + 0.20);
+        o2.connect(g2); g2.connect(ctx.destination);
+        o2.start(t); o2.stop(t + 0.20);
+      },
       repair: (ctx, t) => {
         // Metallic weld buzz: short sawtooth burst with quick decay
         const osc = ctx.createOscillator();
@@ -22,7 +42,7 @@ export class AudioManager {
         osc.frequency.setValueAtTime(110, t);
         osc.frequency.exponentialRampToValueAtTime(60, t + 0.08);
         gain.gain.setValueAtTime(0.0, t);
-        gain.gain.linearRampToValueAtTime(0.25, t + 0.01);
+        gain.gain.linearRampToValueAtTime(0.55, t + 0.01);
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
         osc.connect(gain); gain.connect(ctx.destination);
         osc.start(t); osc.stop(t + 0.12);

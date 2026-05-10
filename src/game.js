@@ -610,6 +610,11 @@ export class Game {
 
   _tickConstruction(facility, dt, completedState) {
     facility.buildTimer += dt;
+    facility.constructSoundTimer = (facility.constructSoundTimer ?? 0) - dt;
+    if (facility.constructSoundTimer <= 0) {
+      this.audio.play('construct');
+      facility.constructSoundTimer = 1.1;
+    }
     if (facility.buildTimer >= BUILD_DURATION) {
       facility.buildTimer = BUILD_DURATION;
       facility.state = completedState;
@@ -862,7 +867,7 @@ export class Game {
     const BAR_W = 120;
     const BAR_H = 6;
     const bx = sx + (facilityPxW - BAR_W) / 2;
-    const by = sy - 22;
+    const by = sy - 30;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
     ctx.fillStyle = '#1a1f2b';
