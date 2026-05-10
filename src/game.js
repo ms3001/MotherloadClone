@@ -7,6 +7,7 @@ import { buildSprites, tileSprite } from './sprites.js';
 import { TILE, isOre } from './ores.js';
 import { hashStringToSeed, mulberry32 } from './rng.js';
 import { gasPriceFor, GAS_PRICE_PER_UNIT } from './upgrades.js';
+import { Inventory } from './inventory.js';
 
 // How fast the pump dispenses fuel (units per second) while holding F.
 const REFUEL_RATE = 40;
@@ -30,6 +31,7 @@ export class Game {
     this.camera = new Camera(canvas.width, canvas.height);
     this.camera.snapTo(this.digger.x, this.digger.y);
     this.hud = new HUD();
+    this.inventory = new Inventory();
 
     // Gas stations sit on top of the surface dirt. tx/ty is the upper-left tile
     // of the 2x2 sprite; the pump base lands exactly at row SURFACE_ROW.
@@ -111,6 +113,9 @@ export class Game {
 
     this.camera.follow(this.digger.x, this.digger.y);
     this.hud.update(this.digger, this.world);
+
+    if (this.input.pressed('tab')) this.inventory.toggle();
+    this.inventory.update(this.digger);
 
     this.input.endFrame();
   }

@@ -4,7 +4,7 @@ export class Input {
     this.justPressed = new Set();
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
-      if (['w', 'a', 's', 'd', 'f', 'r', ' '].includes(k)) e.preventDefault();
+      if (['w', 'a', 's', 'd', 'f', 'r', ' ', 'tab'].includes(k)) e.preventDefault();
       if (!this.keys.has(k)) this.justPressed.add(k);
       this.keys.add(k);
     });
