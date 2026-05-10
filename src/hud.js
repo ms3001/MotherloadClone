@@ -4,6 +4,7 @@ export class HUD {
     this.fuel = document.getElementById('hud-fuel');
     this.hull = document.getElementById('hud-hull');
     this.cargo = document.getElementById('hud-cargo');
+    this.money = document.getElementById('hud-money');
     this.value = document.getElementById('hud-value');
     this.banner = document.getElementById('banner');
   }
@@ -14,6 +15,7 @@ export class HUD {
     this.fuel.style.width = `${(digger.fuel / digger.maxFuel) * 100}%`;
     this.hull.style.width = `${(digger.hull / digger.maxHull) * 100}%`;
     this.cargo.textContent = `${digger.cargoUsed} / ${digger.maxCargo}`;
+    this.money.textContent = `$${digger.money.toFixed(2)}`;
     this.value.textContent = `$${digger.cargoValue().toLocaleString()}`;
   }
 

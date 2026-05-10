@@ -5,8 +5,8 @@ import { UPGRADES } from './upgrades.js';
 const GRAVITY = 900;          // px/s^2
 const MAX_FALL = 900;         // terminal velocity
 const MAX_RISE = 520;
-const LATERAL_ACCEL = 1500;
-const LATERAL_AIR_ACCEL = 1100;
+const LATERAL_ACCEL = 1000;
+const LATERAL_AIR_ACCEL = 733;
 const GROUND_FRICTION = 1800; // px/s^2 deceleration when no input
 const AIR_DRAG = 200;
 
@@ -49,6 +49,8 @@ export class Digger {
     this._applyAttachmentStats();
     this.fuel = this.maxFuel;
     this.hull = this.maxHull;
+
+    this.money = 100;
 
     // cargo: Map<oreKey, count>
     this.cargo = new Map();

@@ -8,8 +8,8 @@ import { TILE, isOre } from './ores.js';
 import { hashStringToSeed } from './rng.js';
 import { gasPriceFor } from './upgrades.js';
 
-// How fast the pump dispenses fuel (units per second).
-const REFUEL_RATE = 220;
+// How fast the pump dispenses fuel (units per second) while holding F.
+const REFUEL_RATE = 40;
 // Padding (px) added around the pump rectangle for the player-overlap trigger.
 const PUMP_TRIGGER_PADDING = 12;
 
@@ -38,6 +38,8 @@ export class Game {
       { tx: spawnTx + 6, ty: SURFACE_ROW - 2, w: 2, h: 2 },
     ];
     this.refuelingStation = null;
+
+    this.clouds = this._buildClouds(seed);
 
     this.deathTimer = 0;
     this.deathDuration = 1.6;
@@ -99,6 +101,28 @@ export class Game {
     this.input.endFrame();
   }
 
+  _buildClouds(seed) {
+    const clouds = [];
+    const worldPxW = WORLD_W * TILE_SIZE;
+    // Simple deterministic RNG
+    let s = (seed ^ 0xc0ffee) >>> 0;
+    const rng = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 0x100000000; };
+
+    for (let i = 0; i < 28; i++) {
+      const cx = rng() * worldPxW;
+      const cy = (1 + rng() * (SURFACE_ROW * 0.6)) * TILE_SIZE;
+      const rx = 90 + rng() * 130;
+      const ry = 28 + rng() * 36;
+      const puffs = [
+        { dx: 0, dy: 0, sx: 1, sy: 1 },
+        { dx: -(0.25 + rng() * 0.15), dy: -(0.4 + rng() * 0.25), sx: 0.45 + rng() * 0.1, sy: 0.7 + rng() * 0.2 },
+        { dx:  (0.28 + rng() * 0.15), dy: -(0.35 + rng() * 0.2),  sx: 0.42 + rng() * 0.1, sy: 0.65 + rng() * 0.2 },
+      ];
+      clouds.push({ cx, cy, rx, ry, puffs });
+    }
+    return clouds;
+  }
+
   _stationRect(gs) {
     return {
       x: gs.tx * TILE_SIZE,
@@ -122,12 +146,15 @@ export class Game {
       const overlaps = b.x < tx + tw && b.x + b.w > tx && b.y < ty + th && b.y + b.h > ty;
       if (!overlaps) continue;
 
-      const want = REFUEL_RATE * dt;
-      const cost = gasPriceFor(want, { digger: this.digger, world: this.world, station: gs });
-      // No money system yet: only dispense if the station price is zero.
-      if (cost === 0) {
-        this.digger.addFuel(want);
-        this.refuelingStation = gs;
+      this.refuelingStation = gs;
+      if (this.input.down('f')) {
+        const want = REFUEL_RATE * dt;
+        const cost = gasPriceFor(want, { digger: this.digger, world: this.world, station: gs });
+        if (this.digger.money >= cost) {
+          const added = this.digger.addFuel(want);
+          const actualCost = gasPriceFor(added, { digger: this.digger, world: this.world, station: gs });
+          this.digger.money = Math.max(0, this.digger.money - actualCost);
+        }
       }
       break;
     }
@@ -146,6 +173,25 @@ export class Game {
     ctx.fillStyle = top;
     ctx.fillRect(0, 0, cam.viewW, cam.viewH);
 
+    // Clouds (drawn in world space, top of sky)
+    const camX = Math.round(cam.x);
+    const camY = Math.round(cam.y);
+    for (const cloud of this.clouds) {
+      const sx = cloud.cx - camX;
+      const sy = cloud.cy - camY;
+      if (sx + cloud.rx * 1.5 < 0 || sx - cloud.rx * 1.5 > cam.viewW) continue;
+      if (sy + cloud.ry * 1.5 < 0 || sy - cloud.ry * 1.5 > cam.viewH) continue;
+      ctx.save();
+      ctx.globalAlpha = 0.82;
+      ctx.fillStyle = '#f0f8ff';
+      ctx.beginPath();
+      for (const p of cloud.puffs) {
+        ctx.ellipse(sx + p.dx * cloud.rx, sy + p.dy * cloud.ry, cloud.rx * p.sx, cloud.ry * p.sy, 0, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      ctx.restore();
+    }
+
     // Tiles
     const { x0, y0, x1, y1 } = cam.visibleTileBounds();
     for (let ty = y0; ty <= y1; ty++) {
@@ -153,8 +199,8 @@ export class Game {
         const tile = w.get(tx, ty);
         if (tile === TILE.SKY) continue;
         const sprite = tileSprite(this.sprites, tile);
-        const sx = tx * TILE_SIZE - cam.x;
-        const sy = ty * TILE_SIZE - cam.y;
+        const sx = tx * TILE_SIZE - camX;
+        const sy = ty * TILE_SIZE - camY;
         ctx.drawImage(sprite, sx, sy);
 
         // drill progress overlay
@@ -178,8 +224,8 @@ export class Game {
     // Gas stations (drawn after tiles, before digger)
     for (const gs of this.gasStations) {
       const r = this._stationRect(gs);
-      const sx = r.x - cam.x;
-      const sy = r.y - cam.y;
+      const sx = r.x - camX;
+      const sy = r.y - camY;
       // Cull off-screen stations
       if (sx + r.w < 0 || sy + r.h < 0 || sx > cam.viewW || sy > cam.viewH) continue;
       ctx.drawImage(this.sprites.gasPump, sx, sy);
@@ -187,13 +233,14 @@ export class Game {
       if (this.refuelingStation === gs) {
         const cx = sx + r.w / 2;
         const cy = sy - 6;
+        const label = this.input.down('f') ? 'REFUELING  $1/u' : '[F] REFUEL  $1/u';
         ctx.font = 'bold 12px ui-monospace, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillText('REFUELING', cx + 1, cy + 1);
+        ctx.fillText(label, cx + 1, cy + 1);
         ctx.fillStyle = '#ffd166';
-        ctx.fillText('REFUELING', cx, cy);
+        ctx.fillText(label, cx, cy);
       }
     }
 
@@ -208,8 +255,8 @@ export class Game {
     const frames = this.sprites.digger[facing][stateKey];
     const frameIdx = Math.floor(d.animTime * 12) % frames.length;
     const sprite = frames[frameIdx];
-    const dx = Math.round(d.x - TILE_SIZE / 2 - cam.x);
-    const dy = Math.round(d.y - TILE_SIZE / 2 - cam.y);
+    const dx = Math.round(d.x - TILE_SIZE / 2 - camX);
+    const dy = Math.round(d.y - TILE_SIZE / 2 - camY);
     ctx.drawImage(sprite, dx, dy);
   }
 }

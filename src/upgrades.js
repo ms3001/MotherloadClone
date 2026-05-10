@@ -84,7 +84,7 @@ export const UPGRADES = {
 //   amount      — fuel units about to be dispensed this tick
 //   ctx         — { digger, world, station } context for future logic
 // Returns total $ cost (number).
-export const GAS_PRICE_PER_UNIT = 0;
+export const GAS_PRICE_PER_UNIT = 1;
 
 export function gasPriceFor(amount, _ctx) {
   return amount * GAS_PRICE_PER_UNIT;
