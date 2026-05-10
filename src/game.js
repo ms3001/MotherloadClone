@@ -8,6 +8,7 @@ import { TILE, isOre, ORES } from './ores.js';
 import { hashStringToSeed, mulberry32 } from './rng.js';
 import { gasPriceFor, GAS_PRICE_PER_UNIT, UPGRADES } from './upgrades.js';
 import { Inventory } from './inventory.js';
+import { AudioManager } from './audio.js';
 
 const REFUEL_RATE = 40;
 const PUMP_TRIGGER_PADDING = 12;
@@ -51,6 +52,7 @@ export class Game {
     const seed = hashStringToSeed('motherload-' + Date.now());
     this.world = new World(seed);
     this.sprites = buildSprites();
+    this.audio = new AudioManager();
     this.input = new Input();
     this.digger = new Digger(this.world, this.world.spawnPoint());
     this.camera = new Camera(canvas.width, canvas.height);
@@ -716,7 +718,10 @@ export class Game {
         if (depot.shipTimer >= 2) {
           const earned = Math.min(d.maxMoney - d.money, depot.pendingValue);
           d.money += earned;
-          if (earned > 0) depot.payoutPopup = { amount: earned, timer: 2.0 };
+          if (earned > 0) {
+            depot.payoutPopup = { amount: earned, timer: 2.0 };
+            this.audio.play('chaChing');
+          }
           depot.stockpile.clear();
           depot.pendingValue = 0;
           depot.dissolveAlpha = 0;
