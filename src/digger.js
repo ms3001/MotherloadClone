@@ -239,7 +239,7 @@ export class Digger {
   _updateDrillTarget(left, right, down) {
     this.drilling = false;
 
-    // Once drilling has started on a tile, commit to finishing it.
+    // Commit to the current target once drilling has started.
     if (this.drillTarget && this.drillProgress > 0) {
       this.drilling = true;
       return;
@@ -261,6 +261,20 @@ export class Digger {
       this.drillTarget = null;
       this.drillProgress = 0;
       return;
+    }
+
+    // Lock in the chosen tile even before progress accumulates. Without this,
+    // sub-pixel x-movement can flip centerTx each frame and reset progress to
+    // 0 indefinitely, making the drill bounce between neighboring columns.
+    if (this.drillTarget && this.drillTarget.dir === dir) {
+      const t = this.world.get(this.drillTarget.tx, this.drillTarget.ty);
+      if (isDrillable(t) && tileDrillTier(t) <= this.drillTier) {
+        this.drilling = true;
+        return;
+      }
+      // Tile is gone — clear and pick fresh.
+      this.drillTarget = null;
+      this.drillProgress = 0;
     }
 
     const target = this._tileAtFace(dir);
@@ -367,10 +381,23 @@ export class Digger {
     this.fuel = Math.max(0, this.fuel - FUEL_DRILL_RATE * dt);
 
     if (this.drillProgress >= required) {
-      const snapX = this.drillTarget.snapX ?? null;
+      let snapX = this.drillTarget.snapX ?? null;
       this._breakTile(tx, ty, tile);
       this.drillTarget = null;
       this.drillProgress = 0;
+
+      // Suppress snap when the bbox overlaps an adjacent solid tile at the
+      // same row — snapping toward the now-empty hole would yank the player
+      // away from the tile they still need to drill next to it.
+      if (snapX !== null) {
+        const b = this.bbox;
+        const minTx = Math.floor(b.x / TILE_SIZE);
+        const maxTx = Math.floor((b.x + b.w - 0.001) / TILE_SIZE);
+        if (minTx !== maxTx) {
+          const adjTx = tx === minTx ? maxTx : minTx;
+          if (isSolid(this.world.get(adjTx, ty))) snapX = null;
+        }
+      }
       if (snapX !== null) this.snapTargetX = snapX;
     }
   }
