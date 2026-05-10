@@ -17,18 +17,23 @@ export class HUD {
     val.textContent = `${Math.round(current)} / ${max}`;
   }
 
-  update(digger, world) {
+  update(digger, world, dt = 0) {
     const depthM = world.depthMeters(digger.y);
     this.depth.textContent = depthM > 0 ? `-${depthM} m` : `${-depthM} m`;
     this._updateBar(this.fuel, this.fuelVal, digger.fuel, digger.maxFuel);
     this._updateBar(this.hull, this.hullVal, digger.hull, digger.maxHull);
     this._updateBar(this.cargo, this.cargoVal, digger.cargoUsed, digger.maxCargo);
     this._updateBar(this.moneyFill, this.moneyVal, Math.floor(digger.money), digger.maxMoney);
+    if (this._bannerTimer > 0) {
+      this._bannerTimer -= dt;
+      if (this._bannerTimer <= 0) this.hideBanner();
+    }
   }
 
-  showBanner(text, sub) {
+  showBanner(text, sub, duration = null) {
     this.banner.innerHTML = `${text}${sub ? `<span class="sub">${sub}</span>` : ''}`;
     this.banner.classList.remove('hidden');
+    this._bannerTimer = duration ?? 0;
   }
 
   hideBanner() {

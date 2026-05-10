@@ -6,7 +6,7 @@ import { HUD } from './hud.js';
 import { buildSprites, tileSprite } from './sprites.js';
 import { TILE, isOre } from './ores.js';
 import { hashStringToSeed, mulberry32 } from './rng.js';
-import { gasPriceFor, GAS_PRICE_PER_UNIT } from './upgrades.js';
+import { gasPriceFor, GAS_PRICE_PER_UNIT, UPGRADES } from './upgrades.js';
 import { Inventory } from './inventory.js';
 
 // How fast the pump dispenses fuel (units per second) while holding F.
@@ -56,6 +56,15 @@ export class Game {
     this.spawnFlagY = SURFACE_ROW * TILE_SIZE;
 
     this.clouds = this._buildClouds(seed);
+
+    this.nearFlag = false;
+
+    // Auto-load saved game if one exists.
+    const raw = localStorage.getItem('motherload_save');
+    if (raw) {
+      try { this._load(JSON.parse(raw)); }
+      catch { localStorage.removeItem('motherload_save'); }
+    }
 
     this.deathTimer = 0;
     this.deathDuration = 1.6;
@@ -111,8 +120,15 @@ export class Game {
 
     this._updateRefuel(dt);
 
+    const flagCx = this.spawnFlagX + TILE_SIZE / 2;
+    const flagCy = this.spawnFlagY - this.sprites.spawnFlag.height;
+    this.nearFlag = Math.hypot(this.digger.x - flagCx, this.digger.y - flagCy) < TILE_SIZE;
+    if (this.nearFlag && !this.refuelingStation && this.input.pressed('f')) {
+      this._save();
+    }
+
     this.camera.follow(this.digger.x, this.digger.y);
-    this.hud.update(this.digger, this.world);
+    this.hud.update(this.digger, this.world, dt);
 
     if (this.input.pressed('tab')) this.inventory.toggle();
     this.inventory.update(this.digger);
@@ -187,6 +203,66 @@ export class Game {
       this.fuelBought = 0;
       this.fuelBoughtTimer = 0;
     }
+  }
+
+  _save() {
+    const orig = new World(this.world.seed);
+    const cur = this.world.tiles;
+    const ref = orig.tiles;
+    const diff = [];
+    for (let i = 0; i < cur.length; i++) {
+      if (cur[i] !== ref[i]) diff.push([i, cur[i]]);
+    }
+
+    const slots = ['drill', 'fuelTank', 'hull', 'thermal', 'storage', 'engine', 'radar', 'wallet'];
+    const attachments = {};
+    for (const slot of slots) attachments[slot] = UPGRADES[slot].indexOf(this.digger.attachments[slot]);
+
+    const save = {
+      v: 1,
+      seed: this.world.seed,
+      player: {
+        x: this.digger.x, y: this.digger.y,
+        money: this.digger.money,
+        fuel: this.digger.fuel,
+        hull: this.digger.hull,
+        cargo: Object.fromEntries(this.digger.cargo),
+        cargoUsed: this.digger.cargoUsed,
+        attachments,
+      },
+      diff,
+    };
+    localStorage.setItem('motherload_save', JSON.stringify(save));
+    this.hud.showBanner('GAME SAVED', 'Progress stored', 3);
+  }
+
+  _load(save) {
+    this.world = new World(save.seed);
+    // Re-apply surface fixtures (not part of seeded generation).
+    const spawnTx = (WORLD_W / 2) | 0;
+    for (const gs of this.gasStations) {
+      for (let dx = -1; dx < gs.w + 1; dx++) {
+        this.world.set(gs.tx + dx, gs.ty + gs.h, TILE.CONCRETE);
+      }
+    }
+    this.world.set(spawnTx, SURFACE_ROW, TILE.CONCRETE);
+    // Apply player-made changes.
+    for (const [i, v] of save.diff) this.world.tiles[i] = v;
+
+    this.digger.world = this.world;
+    const d = this.digger;
+    const p = save.player;
+    d.x = p.x; d.y = p.y; d.vx = 0; d.vy = 0;
+    d.money = p.money; d.fuel = p.fuel; d.hull = p.hull;
+    d.cargo = new Map(Object.entries(p.cargo));
+    d.cargoUsed = p.cargoUsed;
+
+    const slots = ['drill', 'fuelTank', 'hull', 'thermal', 'storage', 'engine', 'radar', 'wallet'];
+    for (const slot of slots) d.attachments[slot] = UPGRADES[slot][p.attachments[slot]];
+    d._applyAttachmentStats();
+
+    if (this.camera) this.camera.snapTo(d.x, d.y);
+    if (this.hud) this.hud.showBanner('WELCOME BACK', 'Game loaded', 3);
   }
 
   _render() {
@@ -288,6 +364,17 @@ export class Game {
     const flagSy = this.spawnFlagY - flagSprite.height - camY;
     if (flagSx + flagSprite.width >= 0 && flagSx <= cam.viewW) {
       ctx.drawImage(flagSprite, flagSx, flagSy);
+      if (this.nearFlag) {
+        const label = '[F] SAVE';
+        const cx = flagSx + flagSprite.width / 2;
+        ctx.font = 'bold 12px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillText(label, cx + 1, flagSy + 1);
+        ctx.fillStyle = '#ffd166';
+        ctx.fillText(label, cx, flagSy);
+      }
     }
 
     // Digger

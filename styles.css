@@ -194,6 +194,33 @@ html, body {
   margin: 4px 0;
 }
 
+#inv-reset-btn {
+  position: relative;
+  margin-top: 14px;
+  padding: 7px 12px;
+  border: 1px solid rgba(230, 57, 70, 0.4);
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #e63946;
+  pointer-events: auto;
+  user-select: none;
+}
+
+#inv-reset-btn:hover { border-color: rgba(230, 57, 70, 0.7); }
+
+#inv-reset-progress {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0%;
+  background: rgba(230, 57, 70, 0.25);
+}
+
+#inv-reset-label { position: relative; }
+
 @keyframes sparkle {
   0%,  100% { filter: brightness(1); }
   50%        { filter: brightness(1.6) saturate(1.3); }

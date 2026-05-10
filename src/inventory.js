@@ -23,6 +23,8 @@ function tierIndexOf(slot, equipped) {
   return idx === -1 ? 0 : idx;
 }
 
+const RESET_HOLD_MS = 3000;
+
 export class Inventory {
   constructor() {
     this.panel       = document.getElementById('inventory');
@@ -30,6 +32,41 @@ export class Inventory {
     this.cargoFooter = document.getElementById('inv-cargo-footer');
     this.drillerList = document.getElementById('inv-driller-list');
     this.visible     = false;
+
+    this._resetBtn      = document.getElementById('inv-reset-btn');
+    this._resetProgress = document.getElementById('inv-reset-progress');
+    this._resetLabel    = document.getElementById('inv-reset-label');
+    this._resetStart    = null;
+    this._resetRaf      = null;
+
+    this._resetBtn.addEventListener('mousedown', () => this._beginReset());
+    this._resetBtn.addEventListener('mouseleave', () => this._cancelReset());
+    document.addEventListener('mouseup', () => this._cancelReset());
+  }
+
+  _beginReset() {
+    this._resetStart = performance.now();
+    this._tickReset();
+  }
+
+  _tickReset() {
+    const frac = Math.min(1, (performance.now() - this._resetStart) / RESET_HOLD_MS);
+    this._resetProgress.style.width = `${frac * 100}%`;
+    if (frac >= 1) {
+      localStorage.removeItem('motherload_save');
+      location.reload();
+      return;
+    }
+    this._resetRaf = requestAnimationFrame(() => this._tickReset());
+  }
+
+  _cancelReset() {
+    if (this._resetRaf !== null) {
+      cancelAnimationFrame(this._resetRaf);
+      this._resetRaf = null;
+    }
+    this._resetStart = null;
+    this._resetProgress.style.width = '0%';
   }
 
   toggle() {
