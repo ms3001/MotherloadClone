@@ -207,7 +207,10 @@ export class Game {
       if (this.upgradeLab.panelOpen) this.upgradeLab.panelOpen = false;
       else this.inventory.toggle();
     }
-    this.inventory.update(this.digger);
+    const tabHeld = this.input.down('f') && this.inventory.visible;
+    this._tabHoldTimer = tabHeld ? (this._tabHoldTimer ?? 0) + dt : 0;
+    if (this._tabHoldTimer >= 3) { localStorage.removeItem('motherload_save'); location.reload(); }
+    this.inventory.update(this.digger, Math.min(1, (this._tabHoldTimer ?? 0) / 3));
 
     this.input.endFrame();
   }
@@ -1158,9 +1161,9 @@ export class Game {
           if (this.input.pressed('escape') || this.input.pressed('tab')) {
             lab.panelOpen = false;
           } else {
-            if (this.input.pressed('arrowup'))
+            if (this.input.pressed('w'))
               lab.panelRow = (lab.panelRow - 1 + DRILLER_SLOTS.length) % DRILLER_SLOTS.length;
-            if (this.input.pressed('arrowdown'))
+            if (this.input.pressed('s'))
               lab.panelRow = (lab.panelRow + 1) % DRILLER_SLOTS.length;
             if (this.input.pressed('f'))
               this._purchaseUpgrade(lab.panelRow);
