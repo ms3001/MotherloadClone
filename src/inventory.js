@@ -11,7 +11,7 @@ const RARITY_COLORS = [
   '#e63946', // 6 — red  (sparkle)
 ];
 const SPARKLE_TIERS = new Set([5, 6]);
-const DRILLER_SLOTS = ['drill', 'fuelTank', 'hull', 'thermal', 'storage', 'engine', 'radar'];
+const DRILLER_SLOTS = ['drill', 'fuelTank', 'hull', 'thermal', 'storage', 'engine', 'radar', 'wallet'];
 const ORE_BY_KEY = new Map(ORES.map(o => [o.key, o]));
 
 function slotLabel(key) {

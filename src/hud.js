@@ -7,7 +7,8 @@ export class HUD {
     this.hullVal = document.getElementById('hud-hull-val');
     this.cargo = document.getElementById('hud-cargo');
     this.cargoVal = document.getElementById('hud-cargo-val');
-    this.money = document.getElementById('hud-money');
+    this.moneyFill = document.getElementById('hud-money');
+    this.moneyVal  = document.getElementById('hud-money-val');
     this.banner = document.getElementById('banner');
   }
 
@@ -22,7 +23,7 @@ export class HUD {
     this._updateBar(this.fuel, this.fuelVal, digger.fuel, digger.maxFuel);
     this._updateBar(this.hull, this.hullVal, digger.hull, digger.maxHull);
     this._updateBar(this.cargo, this.cargoVal, digger.cargoUsed, digger.maxCargo);
-    this.money.textContent = `$${digger.money.toFixed(2)}`;
+    this._updateBar(this.moneyFill, this.moneyVal, Math.floor(digger.money), digger.maxMoney);
   }
 
   showBanner(text, sub) {

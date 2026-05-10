@@ -45,6 +45,7 @@ export class Digger {
       storage:  UPGRADES.storage[0],
       engine:   UPGRADES.engine[0],
       radar:    UPGRADES.radar[0],
+      wallet:   UPGRADES.wallet[0],
     };
     this._applyAttachmentStats();
     this.fuel = this.maxFuel;
@@ -214,12 +215,14 @@ export class Digger {
     this.maxFuel = this.attachments.fuelTank.capacity;
     this.maxHull = this.attachments.hull.hp;
     this.maxCargo = this.attachments.storage.capacity;
+    this.maxMoney = this.attachments.wallet.capacity;
     this.drillTier = this.attachments.drill.drillTier;
     this.drillPower = this.attachments.drill.power;
     this.thrust = this.attachments.engine.thrust;
     this.lateralMax = this.attachments.engine.lateralMax;
     if (this.fuel > this.maxFuel) this.fuel = this.maxFuel;
     if (this.hull > this.maxHull) this.hull = this.maxHull;
+    if (this.money > this.maxMoney) this.money = this.maxMoney;
   }
 
   // Refuel by `units`. Returns the actual amount added (clamped to capacity).

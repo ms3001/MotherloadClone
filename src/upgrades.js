@@ -65,6 +65,17 @@ export const UPGRADES = {
     { name: 'Antimatter Engine',   lateralMax: 600, thrust: 3600, cost: { platinum: 6, cobalt: 8, ruby: 4, diamond: 1 } },
   ],
 
+  // capacity: max credits the player can hold.
+  wallet: [
+    { name: 'Coin Purse',     capacity:    500, cost: null },
+    { name: 'Leather Wallet', capacity:   1500, cost: { copper: 8,  iron: 4 } },
+    { name: 'Money Clip',     capacity:   4000, cost: { iron: 8,   silver: 6 } },
+    { name: 'Cash Roll',      capacity:  10000, cost: { silver: 8,  gold: 4 } },
+    { name: 'Safe Deposit',   capacity:  30000, cost: { gold: 6,   platinum: 4 } },
+    { name: 'Credit Chip',    capacity: 100000, cost: { cobalt: 6,  ruby: 4 } },
+    { name: 'Quantum Vault',  capacity: 500000, cost: { diamond: 4, tungsten: 6 } },
+  ],
+
   // range: tiles around the digger where ores are highlighted.
   // colorCode: highlight rare ores with a colored ring.
   // valuePreview: show $ value floating over revealed ores.

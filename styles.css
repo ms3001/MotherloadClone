@@ -82,6 +82,7 @@ html, body {
 #hud .fill.fuel  { background: linear-gradient(90deg, #f0a13a, #ffd166); }
 #hud .fill.hull  { background: linear-gradient(90deg, #d34d4d, #ff8b3a); }
 #hud .fill.cargo { background: linear-gradient(90deg, #4a90d9, #7ec8e3); }
+#hud .fill.money { background: linear-gradient(90deg, #2d7a3a, #6fcf5a); }
 
 #banner {
   position: fixed;
