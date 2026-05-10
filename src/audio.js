@@ -2,6 +2,31 @@ export class AudioManager {
   constructor() {
     this._ctx = null;
     this._sounds = {
+      repair: (ctx, t) => {
+        // Metallic weld buzz: short sawtooth burst with quick decay
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, t);
+        osc.frequency.linearRampToValueAtTime(140, t + 0.07);
+        gain.gain.setValueAtTime(0.18, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.09);
+      },
+      refuel: (ctx, t) => {
+        // Low pump thump: sine sweep 110→60 Hz, fast decay
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(110, t);
+        osc.frequency.exponentialRampToValueAtTime(60, t + 0.08);
+        gain.gain.setValueAtTime(0.0, t);
+        gain.gain.linearRampToValueAtTime(0.25, t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.12);
+      },
       chaChing: (ctx, t) => {
         const o1 = ctx.createOscillator();
         const g1 = ctx.createGain();

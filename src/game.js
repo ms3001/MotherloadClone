@@ -69,6 +69,7 @@ export class Game {
     this.refuelingStation = null;
     this.fuelBought = 0;
     this.fuelBoughtTimer = 0;
+    this._refuelSoundTimer = 0;
 
     // Concrete tiles beneath each gas station + 1-tile overhang on each side
     for (const gs of this.gasStations) {
@@ -106,6 +107,7 @@ export class Game {
       playerNear: false,
       repairBought: 0,
       repairBoughtTimer: 0,
+      repairSoundTimer: 0,
     };
     this._initFacilityTiles(this.repairShop);
 
@@ -321,6 +323,15 @@ export class Game {
         this.digger.money = Math.max(0, this.digger.money - actualCost);
         this.fuelBought += added;
         this.fuelBoughtTimer = 3;
+        if (added > 0) {
+          this._refuelSoundTimer -= dt;
+          if (this._refuelSoundTimer <= 0) {
+            this.audio.play('refuel');
+            this._refuelSoundTimer = 0.18;
+          }
+        } else {
+          this._refuelSoundTimer = 0;
+        }
       }
       break;
     }
@@ -328,6 +339,7 @@ export class Game {
     if (this.refuelingStation === null) {
       this.fuelBought = 0;
       this.fuelBoughtTimer = 0;
+      this._refuelSoundTimer = 0;
     }
   }
 
@@ -578,8 +590,8 @@ export class Game {
       const frames = this.sprites.digger[facing][stateKey];
       const frameIdx = Math.floor(d.animTime * 12) % frames.length;
       const sprite = frames[frameIdx];
-      const dx = Math.round(d.x + d.drillNudgeX - TILE_SIZE / 2 - camX);
-      const dy = Math.round(d.y + d.drillNudgeY - TILE_SIZE / 2 + 2 - camY);
+      const dx = Math.round(d.x - TILE_SIZE / 2 - camX);
+      const dy = Math.round(d.y - TILE_SIZE / 2 + 2 - camY);
       ctx.drawImage(sprite, dx, dy);
     }
 
@@ -1074,6 +1086,7 @@ export class Game {
             shop.repairBoughtTimer -= dt;
             if (shop.repairBoughtTimer <= 0) shop.repairBought = 0;
           }
+          shop.repairSoundTimer = 0;
           break;
         }
         if (d.hull >= d.maxHull || d.money <= 0) break;
@@ -1085,6 +1098,11 @@ export class Game {
         d.money = Math.max(0, d.money - want * REPAIR_PRICE_PER_HP);
         shop.repairBought += want;
         shop.repairBoughtTimer = 3;
+        shop.repairSoundTimer -= dt;
+        if (shop.repairSoundTimer <= 0) {
+          this.audio.play('repair');
+          shop.repairSoundTimer = 0.22;
+        }
         break;
       }
     }
