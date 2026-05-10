@@ -22,6 +22,12 @@ export class HUD {
     this.depth.textContent = depthM > 0 ? `-${depthM} m` : `${-depthM} m`;
     this._updateBar(this.fuel, this.fuelVal, digger.fuel, digger.maxFuel);
     this._updateBar(this.hull, this.hullVal, digger.hull, digger.maxHull);
+    const fuelLow = digger.fuel <= 10 || digger.fuel / digger.maxFuel <= 0.05;
+    const hullLow = digger.hull <= 10 || digger.hull / digger.maxHull <= 0.05;
+    this.fuel.classList.toggle('low', fuelLow);
+    this.fuel.parentElement.classList.toggle('low', fuelLow);
+    this.hull.classList.toggle('low', hullLow);
+    this.hull.parentElement.classList.toggle('low', hullLow);
     this._updateBar(this.cargo, this.cargoVal, digger.cargoUsed, digger.maxCargo);
     this._updateBar(this.moneyFill, this.moneyVal, Math.floor(digger.money), digger.maxMoney);
     if (this._bannerTimer > 0) {
