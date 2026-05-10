@@ -195,10 +195,85 @@ function composeDigger({ thrusting, drilling, frame, facingLeft }) {
   return c;
 }
 
+function drawGasPump(ctx) {
+  // 64x64 sprite (32 logical px @ PX=2). Pump occupies the bottom-most
+  // tile-row's worth of pixels resting on the surface; top row has
+  // sign/canopy.
+  // Background is transparent; only paint the pump body.
+
+  // Canopy / sign on top
+  // Pole
+  ctx.fillStyle = '#3a3f4a';
+  ctx.fillRect(14 * PX, 2 * PX, 4 * PX, 6 * PX);   // pole
+
+  // Sign board
+  ctx.fillStyle = '#d34d4d';
+  ctx.fillRect(2 * PX, 1 * PX, 28 * PX, 6 * PX);
+  ctx.fillStyle = '#a93a1c';
+  ctx.fillRect(2 * PX, 6 * PX, 28 * PX, 1 * PX);   // shadow under sign
+  // "GAS" text — three short bars in white pixels
+  ctx.fillStyle = '#ffffff';
+  // G
+  ctx.fillRect(7 * PX, 3 * PX, 3 * PX, 1 * PX);
+  ctx.fillRect(7 * PX, 4 * PX, 1 * PX, 2 * PX);
+  ctx.fillRect(7 * PX, 5 * PX, 3 * PX, 1 * PX);
+  ctx.fillRect(9 * PX, 4 * PX, 1 * PX, 1 * PX);
+  // A
+  ctx.fillRect(12 * PX, 4 * PX, 1 * PX, 2 * PX);
+  ctx.fillRect(14 * PX, 4 * PX, 1 * PX, 2 * PX);
+  ctx.fillRect(13 * PX, 3 * PX, 1 * PX, 1 * PX);
+  ctx.fillRect(13 * PX, 4 * PX, 1 * PX, 1 * PX);
+  // S
+  ctx.fillRect(17 * PX, 3 * PX, 3 * PX, 1 * PX);
+  ctx.fillRect(17 * PX, 4 * PX, 1 * PX, 1 * PX);
+  ctx.fillRect(17 * PX, 5 * PX, 3 * PX, 1 * PX);
+  ctx.fillRect(19 * PX, 4 * PX, 1 * PX, 1 * PX);   // (note this overpaints A's right column slightly — fine visually)
+
+  // Pump body (lower section ~rows 10..30)
+  ctx.fillStyle = '#f0a13a';
+  ctx.fillRect(8 * PX, 10 * PX, 16 * PX, 20 * PX);
+  // Body shadows / outlines
+  ctx.fillStyle = '#a85f15';
+  ctx.fillRect(8 * PX, 10 * PX, 16 * PX, 1 * PX);
+  ctx.fillRect(8 * PX, 29 * PX, 16 * PX, 1 * PX);
+  ctx.fillRect(22 * PX, 10 * PX, 2 * PX, 20 * PX);
+  // Highlight
+  ctx.fillStyle = '#ffd166';
+  ctx.fillRect(9 * PX, 11 * PX, 1 * PX, 18 * PX);
+
+  // Display screen
+  ctx.fillStyle = '#1a2233';
+  ctx.fillRect(11 * PX, 13 * PX, 10 * PX, 5 * PX);
+  ctx.fillStyle = '#7df5b2';
+  ctx.fillRect(12 * PX, 14 * PX, 8 * PX, 1 * PX);
+  ctx.fillRect(12 * PX, 16 * PX, 5 * PX, 1 * PX);
+
+  // Nozzle handle (right side)
+  ctx.fillStyle = '#2a2d36';
+  ctx.fillRect(24 * PX, 14 * PX, 4 * PX, 2 * PX);   // hose attach
+  // Hose curve (zig-zag pixels)
+  ctx.fillStyle = '#1c1e25';
+  ctx.fillRect(28 * PX, 14 * PX, 1 * PX, 4 * PX);
+  ctx.fillRect(27 * PX, 18 * PX, 2 * PX, 1 * PX);
+  ctx.fillRect(27 * PX, 19 * PX, 1 * PX, 4 * PX);
+  // Nozzle gun
+  ctx.fillStyle = '#5a5f6b';
+  ctx.fillRect(26 * PX, 22 * PX, 3 * PX, 3 * PX);
+  ctx.fillStyle = '#3a3f4a';
+  ctx.fillRect(25 * PX, 23 * PX, 1 * PX, 2 * PX);
+
+  // Base plate
+  ctx.fillStyle = '#3a3f4a';
+  ctx.fillRect(6 * PX, 30 * PX, 20 * PX, 2 * PX);
+  ctx.fillStyle = '#2a2d36';
+  ctx.fillRect(6 * PX, 31 * PX, 20 * PX, 1 * PX);
+}
+
 export function buildSprites() {
   const sprites = {
     tiles: {},
     digger: {},
+    gasPump: null,
   };
 
   // Tile sprites
@@ -228,6 +303,13 @@ export function buildSprites() {
     drawOreTile(c.getContext('2d'), ore);
     sprites.tiles[ore.id] = c;
   }
+
+  // Gas pump (64x64, 32 logical px @ PX=2)
+  const pumpC = makeCanvas(64);
+  const pumpCtx = pumpC.getContext('2d');
+  pumpCtx.imageSmoothingEnabled = false;
+  drawGasPump(pumpCtx);
+  sprites.gasPump = pumpC;
 
   // Digger variants — index by [facing][thrust][drill][frame]
   sprites.digger = {

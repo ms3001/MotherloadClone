@@ -1,4 +1,4 @@
-import { World, TILE_SIZE, SURFACE_ROW } from './world.js';
+import { World, TILE_SIZE, SURFACE_ROW, WORLD_W } from './world.js';
 import { Digger } from './digger.js';
 import { Camera } from './camera.js';
 import { Input } from './input.js';
@@ -6,6 +6,12 @@ import { HUD } from './hud.js';
 import { buildSprites, tileSprite } from './sprites.js';
 import { TILE, isOre } from './ores.js';
 import { hashStringToSeed } from './rng.js';
+import { gasPriceFor } from './upgrades.js';
+
+// How fast the pump dispenses fuel (units per second).
+const REFUEL_RATE = 220;
+// Padding (px) added around the pump rectangle for the player-overlap trigger.
+const PUMP_TRIGGER_PADDING = 12;
 
 export class Game {
   constructor(canvas) {
@@ -24,6 +30,14 @@ export class Game {
     this.camera = new Camera(canvas.width, canvas.height);
     this.camera.snapTo(this.digger.x, this.digger.y);
     this.hud = new HUD();
+
+    // Gas stations sit on top of the surface dirt. tx/ty is the upper-left tile
+    // of the 2x2 sprite; the pump base lands exactly at row SURFACE_ROW.
+    const spawnTx = (WORLD_W / 2) | 0;
+    this.gasStations = [
+      { tx: spawnTx + 6, ty: SURFACE_ROW - 2, w: 2, h: 2 },
+    ];
+    this.refuelingStation = null;
 
     this.deathTimer = 0;
     this.deathDuration = 1.6;
@@ -77,10 +91,46 @@ export class Game {
       this.hud.showBanner(this.digger.deathReason ?? 'Wrecked', 'Respawning at surface...');
     }
 
+    this._updateRefuel(dt);
+
     this.camera.follow(this.digger.x, this.digger.y);
     this.hud.update(this.digger, this.world);
 
     this.input.endFrame();
+  }
+
+  _stationRect(gs) {
+    return {
+      x: gs.tx * TILE_SIZE,
+      y: gs.ty * TILE_SIZE,
+      w: gs.w * TILE_SIZE,
+      h: gs.h * TILE_SIZE,
+    };
+  }
+
+  _updateRefuel(dt) {
+    this.refuelingStation = null;
+    if (this.digger.dead) return;
+
+    const b = this.digger.bbox;
+    for (const gs of this.gasStations) {
+      const r = this._stationRect(gs);
+      const tx = r.x - PUMP_TRIGGER_PADDING;
+      const ty = r.y - PUMP_TRIGGER_PADDING;
+      const tw = r.w + PUMP_TRIGGER_PADDING * 2;
+      const th = r.h + PUMP_TRIGGER_PADDING * 2;
+      const overlaps = b.x < tx + tw && b.x + b.w > tx && b.y < ty + th && b.y + b.h > ty;
+      if (!overlaps) continue;
+
+      const want = REFUEL_RATE * dt;
+      const cost = gasPriceFor(want, { digger: this.digger, world: this.world, station: gs });
+      // No money system yet: only dispense if the station price is zero.
+      if (cost === 0) {
+        this.digger.addFuel(want);
+        this.refuelingStation = gs;
+      }
+      break;
+    }
   }
 
   _render() {
@@ -122,6 +172,28 @@ export class Game {
           ctx.lineTo(sx + 8, sy + TILE_SIZE - 4);
           ctx.stroke();
         }
+      }
+    }
+
+    // Gas stations (drawn after tiles, before digger)
+    for (const gs of this.gasStations) {
+      const r = this._stationRect(gs);
+      const sx = r.x - cam.x;
+      const sy = r.y - cam.y;
+      // Cull off-screen stations
+      if (sx + r.w < 0 || sy + r.h < 0 || sx > cam.viewW || sy > cam.viewH) continue;
+      ctx.drawImage(this.sprites.gasPump, sx, sy);
+
+      if (this.refuelingStation === gs) {
+        const cx = sx + r.w / 2;
+        const cy = sy - 6;
+        ctx.font = 'bold 12px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillText('REFUELING', cx + 1, cy + 1);
+        ctx.fillStyle = '#ffd166';
+        ctx.fillText('REFUELING', cx, cy);
       }
     }
 

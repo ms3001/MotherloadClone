@@ -2,7 +2,7 @@ import { mulberry32 } from './rng.js';
 import { TILE, ORES, isOre, ORE_BY_ID } from './ores.js';
 
 export const TILE_SIZE = 32;
-export const WORLD_W = 500;
+export const WORLD_W = 222;
 export const WORLD_H = 12000;
 export const SURFACE_ROW = 10; // rows 0..9 are sky; row 10 is the top dirt row
 
