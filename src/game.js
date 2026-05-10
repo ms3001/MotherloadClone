@@ -306,8 +306,8 @@ export class Game {
     const frames = this.sprites.digger[facing][stateKey];
     const frameIdx = Math.floor(d.animTime * 12) % frames.length;
     const sprite = frames[frameIdx];
-    const dx = Math.round(d.x - TILE_SIZE / 2 - camX);
-    const dy = Math.round(d.y - TILE_SIZE / 2 + 2 - camY);
+    const dx = Math.round(d.x + d.drillNudgeX - TILE_SIZE / 2 - camX);
+    const dy = Math.round(d.y + d.drillNudgeY - TILE_SIZE / 2 + 2 - camY);
     ctx.drawImage(sprite, dx, dy);
   }
 }

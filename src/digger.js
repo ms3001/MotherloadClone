@@ -62,6 +62,11 @@ export class Digger {
     this.drilling = false;   // true this frame
     this.thrusting = false;  // true this frame
 
+    // Visual drill nudge (pixels, render-only)
+    this.drillNudgeX = 0;
+    this.drillNudgeY = 0;
+    this.snapTargetX = null;
+
     // Animation
     this.animTime = 0;
 
@@ -89,6 +94,9 @@ export class Digger {
     this.cargoUsed = 0;
     this.drillTarget = null;
     this.drillProgress = 0;
+    this.drillNudgeX = 0;
+    this.drillNudgeY = 0;
+    this.snapTargetX = null;
     this.deathReason = reason;
     this.dead = false;
   }
@@ -140,6 +148,30 @@ export class Digger {
     // ---- Drilling: pick a target if input asks for it ----
     this._updateDrillTarget(left, right, down);
     this._progressDrill(dt);
+
+    // ---- Snap to tile center after single-column downward drill ----
+    if (this.snapTargetX !== null) {
+      const diff = this.snapTargetX - this.x;
+      if (Math.abs(diff) < 0.5) {
+        this.x = this.snapTargetX;
+        this.snapTargetX = null;
+      } else {
+        this.x += diff * Math.min(1, 12 * dt);
+      }
+    }
+
+    // ---- Drill nudge (visual only) ----
+    const MAX_NUDGE = 5;
+    let targetNudgeX = 0, targetNudgeY = 0;
+    if (this.drillTarget && this.drillProgress > 0) {
+      const d = this.drillTarget.dir;
+      if (d === 'down')  targetNudgeY =  MAX_NUDGE;
+      else if (d === 'right') targetNudgeX =  MAX_NUDGE;
+      else if (d === 'left')  targetNudgeX = -MAX_NUDGE;
+    }
+    const nudgeSpeed = targetNudgeX !== 0 || targetNudgeY !== 0 ? 40 : 20;
+    this.drillNudgeX += (targetNudgeX - this.drillNudgeX) * Math.min(1, nudgeSpeed * dt);
+    this.drillNudgeY += (targetNudgeY - this.drillNudgeY) * Math.min(1, nudgeSpeed * dt);
 
     // ---- Move with collision (axis-separated) ----
     const prevVy = this.vy;
@@ -200,6 +232,12 @@ export class Digger {
   _updateDrillTarget(left, right, down) {
     this.drilling = false;
 
+    // Once drilling has started on a tile, commit to finishing it.
+    if (this.drillTarget && this.drillProgress > 0) {
+      this.drilling = true;
+      return;
+    }
+
     // Priority: down > sideways (in input direction).
     let dir = null;
     if (down) dir = 'down';
@@ -243,20 +281,36 @@ export class Digger {
       const tileTop = cellY * TILE_SIZE;
       if (tileTop - (b.y + b.h) > FACE_TOL) return null;
       ty = cellY;
-      // Check all columns the hitbox spans, preferring center
-      const minTx = Math.floor(b.x / TILE_SIZE);
-      const maxTx = Math.floor((b.x + b.w - 0.001) / TILE_SIZE);
+
       const centerTx = Math.floor(this.x / TILE_SIZE);
-      const candidates = [...new Set([centerTx, minTx, maxTx])];
+      // Allow multi-column only when the center is within 6/100 of a tile width from a boundary
+      const offsetInTile = this.x - centerTx * TILE_SIZE;
+      const DUAL_THRESHOLD = TILE_SIZE * 6 / 100;
+      const nearBoundary = offsetInTile < DUAL_THRESHOLD || offsetInTile > TILE_SIZE - DUAL_THRESHOLD;
+
+      let candidates;
+      if (nearBoundary) {
+        const minTx = Math.floor(b.x / TILE_SIZE);
+        const maxTx = Math.floor((b.x + b.w - 0.001) / TILE_SIZE);
+        candidates = [...new Set([centerTx, minTx, maxTx])];
+      } else {
+        candidates = [centerTx];
+      }
+
       tx = null;
       for (const cx of candidates) {
-        const tile = w.get(cx, ty);
-        if (isDrillable(tile) && !w.isProtected(cx, ty) && tileDrillTier(tile) <= this.drillTier) {
+        if (!w.inBounds(cx, ty)) continue;
+        const t = w.get(cx, ty);
+        if (isDrillable(t) && !w.isProtected(cx, ty) && tileDrillTier(t) <= this.drillTier) {
           tx = cx;
           break;
         }
       }
       if (tx === null) return null;
+
+      // Single-column drills snap the digger to tile center after breaking
+      const snapX = nearBoundary ? null : tx * TILE_SIZE + TILE_SIZE / 2;
+      return { tx, ty, snapX };
     } else if (dir === 'right') {
       const cellX = Math.floor((b.x + b.w + 0.5) / TILE_SIZE);
       const tileLeft = cellX * TILE_SIZE;
@@ -301,9 +355,11 @@ export class Digger {
     this.fuel = Math.max(0, this.fuel - FUEL_DRILL_RATE * dt);
 
     if (this.drillProgress >= required) {
+      const snapX = this.drillTarget.snapX ?? null;
       this._breakTile(tx, ty, tile);
       this.drillTarget = null;
       this.drillProgress = 0;
+      if (snapX !== null) this.snapTargetX = snapX;
     }
   }
 
