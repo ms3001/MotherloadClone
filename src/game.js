@@ -458,23 +458,28 @@ export class Game {
       if (this.refuelingStation === gs) {
         const cx = sx + r.w / 2;
         const refueling = this.input.down('f');
-        const label = refueling ? 'REFUELING  $1/L' : '[F] REFUEL  $1/L';
+        const action = refueling ? 'REFUELING' : '[F] REFUEL';
         ctx.font = 'bold 12px ui-monospace, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         let cy = sy - 6;
         if (this.fuelBought > 0) {
-          const sub = `+${Math.floor(this.fuelBought)} L pumped`;
+          const pumped = `+${Math.floor(this.fuelBought)} L pumped`;
           ctx.fillStyle = 'rgba(0,0,0,0.6)';
-          ctx.fillText(sub, cx + 1, cy + 1);
+          ctx.fillText(pumped, cx + 1, cy + 1);
           ctx.fillStyle = '#a8e6a0';
-          ctx.fillText(sub, cx, cy);
+          ctx.fillText(pumped, cx, cy);
           cy -= 16;
         }
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillText(label, cx + 1, cy + 1);
+        ctx.fillText('$1/L', cx + 1, cy + 1);
+        ctx.fillStyle = '#c8a030';
+        ctx.fillText('$1/L', cx, cy);
+        cy -= 16;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillText(action, cx + 1, cy + 1);
         ctx.fillStyle = '#ffd166';
-        ctx.fillText(label, cx, cy);
+        ctx.fillText(action, cx, cy);
       }
     }
 
@@ -714,10 +719,10 @@ export class Game {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
 
-    let label, color;
+    let label, color, sub, subColor;
     if (depot.state === 'shack') {
-      label = depot.flashTimer > 0 ? depot.flashMsg : `[F] BUILD ORE DEPOT (${COPPER_BUILD_COST} copper)`;
-      color = depot.flashTimer > 0 ? '#e63946' : '#ffd166';
+      if (depot.flashTimer > 0) { label = depot.flashMsg; color = '#e63946'; }
+      else { label = '[F] BUILD ORE DEPOT'; color = '#ffd166'; sub = `${COPPER_BUILD_COST} copper`; subColor = '#c8a030'; }
     } else if (depot.state === 'constructing') {
       label = 'CONSTRUCTING...';
       color = '#a8e6a0';
@@ -737,6 +742,13 @@ export class Game {
     }
     if (!label) return;
 
+    if (sub) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillText(sub, cx + 1, cy + 1);
+      ctx.fillStyle = subColor;
+      ctx.fillText(sub, cx, cy);
+      cy -= 16;
+    }
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillText(label, cx + 1, cy + 1);
     ctx.fillStyle = color;
@@ -1065,11 +1077,12 @@ export class Game {
         color = '#9bdcff';
       } else {
         const repairing = this.input.down('f') && d.money > 0;
-        label = repairing ? 'REPAIRING...' : `[F] REPAIR HULL  $${REPAIR_PRICE_PER_HP}/HP`;
-        color = repairing ? '#a8e6a0' : '#ffd166';
-        if (shop.repairBought > 0) {
-          sub = `+${Math.floor(shop.repairBought)} HP repaired`;
-          subColor = '#a8e6a0';
+        if (repairing) {
+          label = 'REPAIRING...'; color = '#a8e6a0';
+          if (shop.repairBought > 0) { sub = `+${Math.floor(shop.repairBought)} HP repaired`; subColor = '#a8e6a0'; }
+        } else {
+          label = '[F] REPAIR HULL'; color = '#ffd166';
+          sub = `$${REPAIR_PRICE_PER_HP}/HP`; subColor = '#c8a030';
         }
       }
     }
@@ -1137,8 +1150,8 @@ export class Game {
             lab.buildTimer = 0;
           } else {
             const missing = [];
-            if (copper < LAB_COPPER_COST) missing.push(`${LAB_COPPER_COST} Cu`);
-            if (iron   < LAB_IRON_COST)   missing.push(`${LAB_IRON_COST} Fe`);
+            if (copper < LAB_COPPER_COST) missing.push(`${LAB_COPPER_COST} copper`);
+            if (iron   < LAB_IRON_COST)   missing.push(`${LAB_IRON_COST} iron`);
             if (d.money < LAB_CREDIT_COST) missing.push(`$${LAB_CREDIT_COST}`);
             lab.flashMsg   = 'NEED ' + missing.join(' + ');
             lab.flashTimer = 2.5;
@@ -1251,7 +1264,7 @@ export class Game {
         label = lab.flashMsg; color = '#e63946';
       } else {
         label = '[F] BUILD UPGRADE LAB'; color = '#ffd166';
-        sub = `${LAB_COPPER_COST}Cu  ${LAB_IRON_COST}Fe  $${LAB_CREDIT_COST}`; subColor = '#c8a030';
+        sub = `${LAB_COPPER_COST} copper  +  ${LAB_IRON_COST} iron  +  $${LAB_CREDIT_COST}`; subColor = '#c8a030';
       }
     } else if (lab.state === 'constructing') {
       label = 'CONSTRUCTING...'; color = '#a8e6a0';
@@ -1298,7 +1311,7 @@ export class Game {
 
     ctx.font = '10px ui-monospace, monospace';
     ctx.fillStyle = '#4a6a8a';
-    ctx.fillText('↑↓ Navigate   [F] Purchase   [Esc] Close', px + PW / 2, py + 36);
+    ctx.fillText('W/S Navigate   [F] Purchase   [Esc] Close', px + PW / 2, py + 36);
 
     ctx.strokeStyle = '#1a3a5a';
     ctx.lineWidth = 1;
