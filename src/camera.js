@@ -15,17 +15,17 @@ export class Camera {
     this.viewH = h;
   }
 
-  // Snap immediately to center on target.
+  // Snap immediately to target, placing it 30% down from the top of the view.
   snapTo(targetX, targetY) {
     this.x = targetX - this.viewW / 2;
-    this.y = targetY - this.viewH / 2;
+    this.y = targetY - this.viewH * 0.3;
     this._clamp();
   }
 
-  // Follow target with a small deadzone.
+  // Follow target with a small deadzone, keeping target 30% down from top.
   follow(targetX, targetY) {
     const cx = this.x + this.viewW / 2;
-    const cy = this.y + this.viewH / 2;
+    const cy = this.y + this.viewH * 0.3;
 
     const dx = targetX - cx;
     const dy = targetY - cy;

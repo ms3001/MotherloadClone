@@ -14,6 +14,7 @@ export class World {
     this.tiles = new Uint8Array(this.w * this.h);
     // per-tile drill progress, only allocated lazily
     this.progress = new Map();
+    this.protected = new Set();
     this._generate();
   }
 
@@ -45,6 +46,14 @@ export class World {
 
   clearProgress(tx, ty) {
     this.progress.delete(this.idx(tx, ty));
+  }
+
+  protect(tx, ty) {
+    if (this.inBounds(tx, ty)) this.protected.add(this.idx(tx, ty));
+  }
+
+  isProtected(tx, ty) {
+    return this.protected.has(this.idx(tx, ty));
   }
 
   _generate() {
@@ -128,7 +137,7 @@ export class World {
   // 1 tile = 1 meter (32px).
   depthMeters(worldY) {
     const surfaceY = SURFACE_ROW * TILE_SIZE;
-    return Math.max(0, Math.floor((worldY - surfaceY) / TILE_SIZE));
+    return Math.floor((worldY - surfaceY) / TILE_SIZE);
   }
 }
 

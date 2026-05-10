@@ -242,8 +242,21 @@ export class Digger {
       const cellY = Math.floor((b.y + b.h + 0.5) / TILE_SIZE);
       const tileTop = cellY * TILE_SIZE;
       if (tileTop - (b.y + b.h) > FACE_TOL) return null;
-      tx = Math.floor((this.x) / TILE_SIZE);
       ty = cellY;
+      // Check all columns the hitbox spans, preferring center
+      const minTx = Math.floor(b.x / TILE_SIZE);
+      const maxTx = Math.floor((b.x + b.w - 0.001) / TILE_SIZE);
+      const centerTx = Math.floor(this.x / TILE_SIZE);
+      const candidates = [...new Set([centerTx, minTx, maxTx])];
+      tx = null;
+      for (const cx of candidates) {
+        const tile = w.get(cx, ty);
+        if (isDrillable(tile) && !w.isProtected(cx, ty) && tileDrillTier(tile) <= this.drillTier) {
+          tx = cx;
+          break;
+        }
+      }
+      if (tx === null) return null;
     } else if (dir === 'right') {
       const cellX = Math.floor((b.x + b.w + 0.5) / TILE_SIZE);
       const tileLeft = cellX * TILE_SIZE;
@@ -263,6 +276,7 @@ export class Digger {
     if (!w.inBounds(tx, ty)) return null;
     const tile = w.get(tx, ty);
     if (!isDrillable(tile)) return null;
+    if (w.isProtected(tx, ty)) return null;
     if (tileDrillTier(tile) > this.drillTier) return null;
     return { tx, ty };
   }

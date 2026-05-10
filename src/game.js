@@ -6,7 +6,7 @@ import { HUD } from './hud.js';
 import { buildSprites, tileSprite } from './sprites.js';
 import { TILE, isOre } from './ores.js';
 import { hashStringToSeed } from './rng.js';
-import { gasPriceFor } from './upgrades.js';
+import { gasPriceFor, GAS_PRICE_PER_UNIT } from './upgrades.js';
 
 // How fast the pump dispenses fuel (units per second) while holding F.
 const REFUEL_RATE = 40;
@@ -38,6 +38,15 @@ export class Game {
       { tx: spawnTx + 6, ty: SURFACE_ROW - 2, w: 2, h: 2 },
     ];
     this.refuelingStation = null;
+    this.fuelBought = 0;
+    this.fuelBoughtTimer = 0;
+
+    // Protect tiles beneath each gas station + the 1-tile footer overhang on each side
+    for (const gs of this.gasStations) {
+      for (let dx = -1; dx < gs.w + 1; dx++) {
+        this.world.protect(gs.tx + dx, gs.ty + gs.h);
+      }
+    }
 
     this.clouds = this._buildClouds(seed);
 
@@ -135,6 +144,12 @@ export class Game {
   _updateRefuel(dt) {
     this.refuelingStation = null;
     if (this.digger.dead) return;
+    if (!this.input.down('f')) {
+      if (this.fuelBoughtTimer > 0) {
+        this.fuelBoughtTimer -= dt;
+        if (this.fuelBoughtTimer <= 0) this.fuelBought = 0;
+      }
+    }
 
     const b = this.digger.bbox;
     for (const gs of this.gasStations) {
@@ -147,16 +162,22 @@ export class Game {
       if (!overlaps) continue;
 
       this.refuelingStation = gs;
-      if (this.input.down('f')) {
-        const want = REFUEL_RATE * dt;
-        const cost = gasPriceFor(want, { digger: this.digger, world: this.world, station: gs });
-        if (this.digger.money >= cost) {
-          const added = this.digger.addFuel(want);
-          const actualCost = gasPriceFor(added, { digger: this.digger, world: this.world, station: gs });
-          this.digger.money = Math.max(0, this.digger.money - actualCost);
-        }
+      if (this.input.down('f') && this.digger.money > 0) {
+        const maxWant = REFUEL_RATE * dt;
+        const affordable = GAS_PRICE_PER_UNIT > 0 ? this.digger.money / GAS_PRICE_PER_UNIT : maxWant;
+        const want = Math.min(maxWant, affordable);
+        const added = this.digger.addFuel(want);
+        const actualCost = gasPriceFor(added, { digger: this.digger, world: this.world, station: gs });
+        this.digger.money = Math.max(0, this.digger.money - actualCost);
+        this.fuelBought += added;
+        this.fuelBoughtTimer = 3;
       }
       break;
+    }
+
+    if (this.refuelingStation === null) {
+      this.fuelBought = 0;
+      this.fuelBoughtTimer = 0;
     }
   }
 
@@ -203,6 +224,14 @@ export class Game {
         const sy = ty * TILE_SIZE - camY;
         ctx.drawImage(sprite, sx, sy);
 
+        // Grass on surface dirt
+        if (ty === SURFACE_ROW && tile === TILE.DIRT) {
+          ctx.fillStyle = '#3a8c30';
+          ctx.fillRect(sx, sy, TILE_SIZE, 4);
+          ctx.fillStyle = '#56b845';
+          ctx.fillRect(sx, sy, TILE_SIZE, 2);
+        }
+
         // drill progress overlay
         const prog = w.getProgress(tx, ty);
         if (prog > 0) {
@@ -228,15 +257,37 @@ export class Game {
       const sy = r.y - camY;
       // Cull off-screen stations
       if (sx + r.w < 0 || sy + r.h < 0 || sx > cam.viewW || sy > cam.viewH) continue;
+
+      // Concrete footer (1 tile wider on each side)
+      const fy = sy + r.h;
+      const fh = 10;
+      const fx = sx - TILE_SIZE;
+      const fw = r.w + TILE_SIZE * 2;
+      ctx.fillStyle = '#5a5e66';
+      ctx.fillRect(fx, fy, fw, fh);
+      ctx.fillStyle = '#7e848f';
+      ctx.fillRect(fx, fy, fw, 2);
+      ctx.fillStyle = '#3e4249';
+      ctx.fillRect(fx, fy + fh - 2, fw, 2);
+
       ctx.drawImage(this.sprites.gasPump, sx, sy);
 
       if (this.refuelingStation === gs) {
         const cx = sx + r.w / 2;
-        const cy = sy - 6;
-        const label = this.input.down('f') ? 'REFUELING  $1/u' : '[F] REFUEL  $1/u';
+        const refueling = this.input.down('f');
+        const label = refueling ? 'REFUELING  $1/L' : '[F] REFUEL  $1/L';
         ctx.font = 'bold 12px ui-monospace, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
+        let cy = sy - 6;
+        if (this.fuelBought > 0) {
+          const sub = `+${Math.floor(this.fuelBought)} L pumped`;
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillText(sub, cx + 1, cy + 1);
+          ctx.fillStyle = '#a8e6a0';
+          ctx.fillText(sub, cx, cy);
+          cy -= 16;
+        }
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillText(label, cx + 1, cy + 1);
         ctx.fillStyle = '#ffd166';
@@ -256,7 +307,7 @@ export class Game {
     const frameIdx = Math.floor(d.animTime * 12) % frames.length;
     const sprite = frames[frameIdx];
     const dx = Math.round(d.x - TILE_SIZE / 2 - camX);
-    const dy = Math.round(d.y - TILE_SIZE / 2 - camY);
+    const dy = Math.round(d.y - TILE_SIZE / 2 + 2 - camY);
     ctx.drawImage(sprite, dx, dy);
   }
 }

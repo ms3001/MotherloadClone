@@ -51,8 +51,9 @@ html, body {
 }
 
 #hud .bar {
+  position: relative;
   flex: 1;
-  height: 10px;
+  height: 14px;
   background: #1a1f2b;
   border: 1px solid #2a3142;
   border-radius: 2px;
@@ -65,8 +66,22 @@ html, body {
   transition: width 100ms linear;
 }
 
-#hud .fill.fuel { background: linear-gradient(90deg, #f0a13a, #ffd166); }
-#hud .fill.hull { background: linear-gradient(90deg, #d34d4d, #ff8b3a); }
+#hud .bar-val {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: rgba(255,255,255,0.85);
+  text-shadow: 0 0 3px rgba(0,0,0,0.9);
+  pointer-events: none;
+  line-height: 1;
+}
+
+#hud .fill.fuel  { background: linear-gradient(90deg, #f0a13a, #ffd166); }
+#hud .fill.hull  { background: linear-gradient(90deg, #d34d4d, #ff8b3a); }
+#hud .fill.cargo { background: linear-gradient(90deg, #4a90d9, #7ec8e3); }
 
 #banner {
   position: fixed;
