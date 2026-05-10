@@ -118,6 +118,7 @@ export class Digger {
     const right = input.down('d');
     const up = input.down('w');
     const down = input.down('s');
+    const hovering = input.down(' ') && !up && this.fuel > 0;
 
     // ---- Vertical: gravity + thrust ----
     this.thrusting = false;
@@ -125,11 +126,18 @@ export class Digger {
       this.vy -= this.thrust * dt;
       this.thrusting = true;
       this.fuel = Math.max(0, this.fuel - FUEL_THRUST_RATE * dt);
+    } else if (hovering) {
+      this.thrusting = true;
+      this.fuel = Math.max(0, this.fuel - FUEL_THRUST_RATE * dt);
     } else {
       this.fuel = Math.max(0, this.fuel - FUEL_IDLE_RATE * dt);
     }
     this.vy += GRAVITY * dt;
     this.vy = Math.max(-MAX_RISE, Math.min(MAX_FALL, this.vy));
+    if (hovering) {
+      this.vy -= GRAVITY * dt;             // cancel gravity
+      this.vy *= Math.max(0, 1 - 3 * dt); // damp toward zero
+    }
 
     // ---- Horizontal: input + friction ----
     const accel = this.onGround ? LATERAL_ACCEL : LATERAL_AIR_ACCEL;

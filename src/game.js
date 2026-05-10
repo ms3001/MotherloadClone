@@ -4,15 +4,24 @@ import { Camera } from './camera.js';
 import { Input } from './input.js';
 import { HUD } from './hud.js';
 import { buildSprites, tileSprite } from './sprites.js';
-import { TILE, isOre } from './ores.js';
+import { TILE, isOre, ORES } from './ores.js';
 import { hashStringToSeed, mulberry32 } from './rng.js';
 import { gasPriceFor, GAS_PRICE_PER_UNIT, UPGRADES } from './upgrades.js';
 import { Inventory } from './inventory.js';
 
-// How fast the pump dispenses fuel (units per second) while holding F.
 const REFUEL_RATE = 40;
-// Padding (px) added around the pump rectangle for the player-overlap trigger.
 const PUMP_TRIGGER_PADDING = 12;
+
+const DEPOT_TRIGGER_PADDING = 12;
+const DEPOT_SELL_RATE       = 2.5;
+const DEPOT_BUILD_DURATION  = 30;
+const COPPER_BUILD_COST     = 12;
+const SHIP_OFFSCREEN_Y      = 0; // world-y at sky top, always above viewport
+
+const ORE_BY_KEY = new Map(ORES.map(o => [o.key, o]));
+
+function _easeInQuad(t)  { return t * t; }
+function _easeOutQuad(t) { return t * (2 - t); }
 
 export class Game {
   constructor(canvas) {
@@ -49,6 +58,24 @@ export class Game {
         this.world.set(gs.tx + dx, gs.ty + gs.h, TILE.CONCRETE);
       }
     }
+
+    // Ore depot: 6-tile-wide facility to the right of the gas station
+    this.oreDepot = {
+      tx: spawnTx + 10, ty: SURFACE_ROW - 2, w: 6, h: 2,
+      state: 'shack',
+      buildTimer: 0,
+      sellAccum: 0,
+      shipY: SHIP_OFFSCREEN_Y,
+      shipTimer: 0,
+      laserTimer: 0,
+      dissolveAlpha: 1,
+      stockpile: new Map(),
+      pendingValue: 0,
+      flashMsg: '',
+      flashTimer: 0,
+      playerNear: false,
+    };
+    this._initDepotTiles();
 
     // Spawn marker: one concrete block at the surface under spawn
     this.world.set(spawnTx, SURFACE_ROW, TILE.CONCRETE);
@@ -119,6 +146,7 @@ export class Game {
     }
 
     this._updateRefuel(dt);
+    this._updateOreDepot(dt);
 
     const flagCx = this.spawnFlagX + TILE_SIZE / 2;
     const flagCy = this.spawnFlagY - this.sprites.spawnFlag.height;
@@ -218,6 +246,13 @@ export class Game {
     const attachments = {};
     for (const slot of slots) attachments[slot] = UPGRADES[slot].indexOf(this.digger.attachments[slot]);
 
+    const depot = this.oreDepot;
+    const depotSave = {
+      state: ['ship_inbound', 'ship_docked', 'ship_departing'].includes(depot.state) ? 'depot' : depot.state,
+      buildTimer: depot.buildTimer,
+      stockpile: Object.fromEntries(depot.stockpile),
+    };
+
     const save = {
       v: 1,
       seed: this.world.seed,
@@ -230,6 +265,7 @@ export class Game {
         cargoUsed: this.digger.cargoUsed,
         attachments,
       },
+      depot: depotSave,
       diff,
     };
     localStorage.setItem('motherload_save', JSON.stringify(save));
@@ -245,9 +281,23 @@ export class Game {
         this.world.set(gs.tx + dx, gs.ty + gs.h, TILE.CONCRETE);
       }
     }
+    this._initDepotTiles();
     this.world.set(spawnTx, SURFACE_ROW, TILE.CONCRETE);
     // Apply player-made changes.
     for (const [i, v] of save.diff) this.world.tiles[i] = v;
+
+    // Restore depot state
+    if (save.depot) {
+      const ds = save.depot;
+      this.oreDepot.state = ds.state ?? 'shack';
+      this.oreDepot.buildTimer = ds.buildTimer ?? 0;
+      this.oreDepot.stockpile = new Map();
+      if (ds.stockpile) {
+        for (const [k, v] of Object.entries(ds.stockpile)) {
+          if (v > 0) this.oreDepot.stockpile.set(k, v);
+        }
+      }
+    }
 
     this.digger.world = this.world;
     const d = this.digger;
@@ -358,6 +408,8 @@ export class Game {
       }
     }
 
+    this._renderOreDepot();
+
     // Spawn flag (drawn above the concrete spawn block)
     const flagSprite = this.sprites.spawnFlag;
     const flagSx = this.spawnFlagX - camX;
@@ -391,6 +443,428 @@ export class Game {
     const dx = Math.round(d.x + d.drillNudgeX - TILE_SIZE / 2 - camX);
     const dy = Math.round(d.y + d.drillNudgeY - TILE_SIZE / 2 + 2 - camY);
     ctx.drawImage(sprite, dx, dy);
+  }
+
+  _initDepotTiles() {
+    const depot = this.oreDepot;
+    for (let dx = -1; dx < depot.w + 1; dx++) {
+      this.world.set(depot.tx + dx, depot.ty + depot.h, TILE.CONCRETE);
+    }
+    for (let dy = 0; dy < depot.h; dy++) {
+      for (let dx = 0; dx < depot.w; dx++) {
+        this.world.set(depot.tx + dx, depot.ty + dy, TILE.SKY);
+      }
+    }
+  }
+
+  _updateOreDepot(dt) {
+    const depot = this.oreDepot;
+    const d = this.digger;
+    if (d.dead) return;
+
+    const b = d.bbox;
+    const rx = depot.tx * TILE_SIZE - DEPOT_TRIGGER_PADDING;
+    const ry = depot.ty * TILE_SIZE - DEPOT_TRIGGER_PADDING;
+    const rw = depot.w  * TILE_SIZE + DEPOT_TRIGGER_PADDING * 2;
+    const rh = depot.h  * TILE_SIZE + DEPOT_TRIGGER_PADDING * 2;
+    depot.playerNear = b.x < rx + rw && b.x + b.w > rx && b.y < ry + rh && b.y + b.h > ry;
+
+    if (depot.flashTimer > 0) depot.flashTimer -= dt;
+
+    switch (depot.state) {
+      case 'shack': {
+        if (depot.playerNear && this.input.pressed('f')) {
+          const copper = d.cargo.get('copper') ?? 0;
+          if (copper >= COPPER_BUILD_COST) {
+            const newCount = copper - COPPER_BUILD_COST;
+            if (newCount === 0) d.cargo.delete('copper');
+            else d.cargo.set('copper', newCount);
+            d.cargoUsed = Math.max(0, d.cargoUsed - COPPER_BUILD_COST);
+            depot.state = 'constructing';
+            depot.buildTimer = 0;
+          } else {
+            depot.flashMsg = `NEED ${COPPER_BUILD_COST} COPPER`;
+            depot.flashTimer = 2;
+          }
+        }
+        break;
+      }
+
+      case 'constructing': {
+        depot.buildTimer += dt;
+        if (depot.buildTimer >= DEPOT_BUILD_DURATION) {
+          depot.buildTimer = DEPOT_BUILD_DURATION;
+          depot.state = 'depot';
+        }
+        break;
+      }
+
+      case 'depot': {
+        if (depot.playerNear && this.input.down('f') && d.cargoUsed > 0) {
+          depot.sellAccum += DEPOT_SELL_RATE * dt;
+          const units = Math.floor(depot.sellAccum);
+          if (units > 0) {
+            depot.sellAccum -= units;
+            this._transferOreToDepot(units);
+          }
+        } else if (!this.input.down('f')) {
+          depot.sellAccum = 0;
+        }
+        if (!depot.playerNear && depot.stockpile.size > 0) {
+          depot.state = 'awaiting_ship';
+          depot.laserTimer = 0;
+        }
+        break;
+      }
+
+      case 'awaiting_ship': {
+        depot.laserTimer += dt;
+        if (depot.laserTimer >= 1.5) {
+          depot.state = 'ship_inbound';
+          depot.shipTimer = 0;
+          depot.shipY = SHIP_OFFSCREEN_Y;
+        }
+        break;
+      }
+
+      case 'ship_inbound': {
+        depot.shipTimer += dt;
+        const t = Math.min(1, depot.shipTimer / 3);
+        const landedY = depot.ty * TILE_SIZE - 40;
+        depot.shipY = SHIP_OFFSCREEN_Y + (landedY - SHIP_OFFSCREEN_Y) * _easeInQuad(t);
+        if (depot.shipTimer >= 3) {
+          depot.state = 'ship_docked';
+          depot.shipTimer = 0;
+          depot.dissolveAlpha = 1;
+          let val = 0;
+          for (const [key, count] of depot.stockpile) {
+            const ore = ORE_BY_KEY.get(key);
+            if (ore) val += ore.value * count;
+          }
+          depot.pendingValue = val;
+        }
+        break;
+      }
+
+      case 'ship_docked': {
+        depot.shipTimer += dt;
+        depot.dissolveAlpha = Math.max(0, 1 - depot.shipTimer / 2);
+        if (depot.shipTimer >= 2) {
+          d.money = Math.min(d.maxMoney, d.money + depot.pendingValue);
+          depot.stockpile.clear();
+          depot.pendingValue = 0;
+          depot.dissolveAlpha = 0;
+          depot.state = 'ship_departing';
+          depot.shipTimer = 0;
+        }
+        break;
+      }
+
+      case 'ship_departing': {
+        depot.shipTimer += dt;
+        const t2 = Math.min(1, depot.shipTimer / 2);
+        const landedY2 = depot.ty * TILE_SIZE - 40;
+        depot.shipY = landedY2 + (SHIP_OFFSCREEN_Y - landedY2) * _easeOutQuad(t2);
+        if (depot.shipTimer >= 2) {
+          depot.state = 'depot';
+          depot.shipTimer = 0;
+          depot.dissolveAlpha = 1;
+        }
+        break;
+      }
+    }
+  }
+
+  _transferOreToDepot(units) {
+    const d = this.digger;
+    const depot = this.oreDepot;
+    let remaining = units;
+    for (const [key, count] of d.cargo) {
+      if (remaining <= 0) break;
+      const ore = ORE_BY_KEY.get(key);
+      if (!ore) continue;
+      const transfer = Math.min(count, remaining);
+      const newCount = count - transfer;
+      if (newCount === 0) d.cargo.delete(key);
+      else d.cargo.set(key, newCount);
+      d.cargoUsed = Math.max(0, d.cargoUsed - transfer * ore.weight);
+      depot.stockpile.set(key, (depot.stockpile.get(key) ?? 0) + transfer);
+      remaining -= transfer;
+    }
+  }
+
+  _renderOreDepot() {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const depot = this.oreDepot;
+    const camX = Math.round(cam.x);
+    const camY = Math.round(cam.y);
+
+    const wx = depot.tx * TILE_SIZE;
+    const wy = depot.ty * TILE_SIZE;
+    const sx = wx - camX;
+    const sy = wy - camY;
+    const spw = depot.w * TILE_SIZE;
+    const sph = depot.h * TILE_SIZE;
+
+    if (sx + spw < 0 || sx > cam.viewW || sy + sph < 0 || sy > cam.viewH) return;
+
+    if (depot.state === 'shack' || depot.state === 'constructing') {
+      ctx.drawImage(this.sprites.oreShack, sx, sy);
+      if (depot.state === 'constructing') {
+        this._renderConstructionShips(ctx, cam, sx, sy, depot.buildTimer);
+        this._renderProgressBar(ctx, sx, sy, depot.buildTimer / DEPOT_BUILD_DURATION);
+      }
+    } else {
+      ctx.drawImage(this.sprites.oreStorage, sx, sy);
+      ctx.drawImage(this.sprites.orePad, sx + 2 * TILE_SIZE, sy);
+      this._renderOreSquares(ctx, sx, sy);
+      if (depot.state === 'ship_inbound' || depot.state === 'ship_docked' || depot.state === 'ship_departing') {
+        const shipScreenY = Math.round(depot.shipY - camY);
+        const padCenterSX = sx + 4 * TILE_SIZE;
+        this._renderTransportShip(ctx, shipScreenY, padCenterSX);
+      }
+      if (depot.state === 'awaiting_ship') {
+        this._renderLaserPulse(ctx, sx, sy, depot.laserTimer);
+      }
+    }
+
+    if (depot.playerNear) this._renderDepotLabel(ctx, sx, sy);
+  }
+
+  _renderDepotLabel(ctx, sx, sy) {
+    const depot = this.oreDepot;
+    const cx = sx + depot.w * TILE_SIZE / 2;
+    let cy = sy - 6;
+
+    ctx.font = 'bold 12px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+
+    let label, color;
+    if (depot.state === 'shack') {
+      label = depot.flashTimer > 0 ? depot.flashMsg : `[F] BUILD DEPOT (${COPPER_BUILD_COST} copper)`;
+      color = depot.flashTimer > 0 ? '#e63946' : '#ffd166';
+    } else if (depot.state === 'constructing') {
+      label = 'CONSTRUCTING...';
+      color = '#a8e6a0';
+    } else if (depot.state === 'depot') {
+      const selling = this.input.down('f') && this.digger.cargoUsed > 0;
+      label = selling ? 'SELLING ORE...' : '[F] SELL ORE';
+      color = selling ? '#a8e6a0' : '#ffd166';
+    } else if (depot.state === 'awaiting_ship' || depot.state === 'ship_inbound') {
+      label = 'SHIP EN ROUTE';
+      color = '#9bdcff';
+    } else if (depot.state === 'ship_docked') {
+      label = 'SHIP DOCKED - WAIT';
+      color = '#ffd166';
+    } else if (depot.state === 'ship_departing') {
+      label = 'DEPARTING...';
+      color = '#a8e6a0';
+    }
+    if (!label) return;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillText(label, cx + 1, cy + 1);
+    ctx.fillStyle = color;
+    ctx.fillText(label, cx, cy);
+  }
+
+  _renderProgressBar(ctx, sx, sy, progress) {
+    const depot = this.oreDepot;
+    const BAR_W = 120;
+    const BAR_H = 6;
+    const bx = sx + (depot.w * TILE_SIZE - BAR_W) / 2;
+    const by = sy - 22;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
+    ctx.fillStyle = '#1a1f2b';
+    ctx.fillRect(bx, by, BAR_W, BAR_H);
+    ctx.fillStyle = '#a8e6a0';
+    ctx.fillRect(bx, by, Math.floor(BAR_W * Math.min(1, progress)), BAR_H);
+  }
+
+  _renderOreSquares(ctx, sx, sy) {
+    const depot = this.oreDepot;
+    if (depot.stockpile.size === 0 || depot.dissolveAlpha <= 0) return;
+
+    const SQUARE = 6;
+    const STEP   = 7; // SQUARE + 1px gap
+    const COLS   = 9;
+    const AREA_H = depot.h * TILE_SIZE; // 64px
+
+    const squares = [];
+    for (const [key, count] of depot.stockpile) {
+      const ore = ORE_BY_KEY.get(key);
+      if (!ore) continue;
+      for (let i = 0; i < count && squares.length < 63; i++) squares.push(ore.color);
+    }
+    if (squares.length === 0) return;
+
+    ctx.save();
+    ctx.globalAlpha = depot.dissolveAlpha;
+
+    let idx = 0;
+    for (let row = 0; idx < squares.length && row * STEP < AREA_H; row++) {
+      for (let col = 0; col < COLS && idx < squares.length; col++) {
+        const qx = sx + col * STEP + 1;
+        const qy = sy + AREA_H - STEP - row * STEP;
+        ctx.fillStyle = squares[idx];
+        ctx.fillRect(qx, qy, SQUARE, SQUARE);
+        idx++;
+      }
+    }
+
+    ctx.restore();
+  }
+
+  _renderTransportShip(ctx, shipScreenY, centerSX) {
+    const cx = centerSX;
+    const ty = shipScreenY;
+    ctx.save();
+
+    // Main trapezoidal body
+    ctx.fillStyle = '#4a5568';
+    ctx.beginPath();
+    ctx.moveTo(cx - 28, ty);
+    ctx.lineTo(cx + 28, ty);
+    ctx.lineTo(cx + 40, ty + 28);
+    ctx.lineTo(cx - 40, ty + 28);
+    ctx.closePath();
+    ctx.fill();
+
+    // Highlight stripe
+    ctx.fillStyle = '#718096';
+    ctx.fillRect(cx - 24, ty + 2, 48, 4);
+
+    // Left fin
+    ctx.fillStyle = '#2d3748';
+    ctx.beginPath();
+    ctx.moveTo(cx - 36, ty + 20);
+    ctx.lineTo(cx - 40, ty + 40);
+    ctx.lineTo(cx - 24, ty + 28);
+    ctx.closePath();
+    ctx.fill();
+
+    // Right fin
+    ctx.beginPath();
+    ctx.moveTo(cx + 36, ty + 20);
+    ctx.lineTo(cx + 40, ty + 40);
+    ctx.lineTo(cx + 24, ty + 28);
+    ctx.closePath();
+    ctx.fill();
+
+    // 3 engine glows
+    for (const nx of [cx - 20, cx, cx + 20]) {
+      ctx.fillStyle = 'rgba(255,140,40,0.35)';
+      ctx.beginPath();
+      ctx.arc(nx, ty + 32, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      ctx.arc(nx, ty + 32, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Cockpit window strip
+    ctx.fillStyle = '#9bdcff';
+    ctx.fillRect(cx - 16, ty + 8, 32, 8);
+    ctx.fillStyle = 'rgba(155,220,255,0.4)';
+    ctx.fillRect(cx - 14, ty + 8, 10, 4);
+
+    ctx.restore();
+  }
+
+  _renderPickupShip(ctx, shipScreenY, centerSX) {
+    const cx = centerSX;
+    const ty = shipScreenY;
+    ctx.save();
+
+    ctx.fillStyle = '#5a6a7a';
+    ctx.beginPath();
+    ctx.moveTo(cx - 12, ty);
+    ctx.lineTo(cx + 12, ty);
+    ctx.lineTo(cx + 20, ty + 14);
+    ctx.lineTo(cx - 20, ty + 14);
+    ctx.closePath();
+    ctx.fill();
+
+    for (const nx of [cx - 8, cx + 8]) {
+      ctx.fillStyle = 'rgba(255,160,40,0.4)';
+      ctx.beginPath();
+      ctx.arc(nx, ty + 18, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      ctx.arc(nx, ty + 18, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  _renderConstructionShips(ctx, cam, sx, sy, buildTimer) {
+    const t = buildTimer;
+    const shackCenterSX = sx + this.oreDepot.w * TILE_SIZE / 2;
+    const aboveSY = sy - cam.viewH;
+
+    if (t < 8) {
+      let shipSY;
+      if (t < 5) {
+        const frac = _easeInQuad(t / 5);
+        shipSY = aboveSY + (sy - 20 - aboveSY) * frac;
+      } else if (t < 6) {
+        shipSY = sy - 20;
+      } else {
+        const frac = _easeOutQuad((t - 6) / 2);
+        shipSY = (sy - 20) + (aboveSY - (sy - 20)) * frac;
+      }
+      this._renderPickupShip(ctx, shipSY, shackCenterSX);
+    }
+
+    if (t >= 22 && t < 29) {
+      const landedSY = sy - 40;
+      let shipSY;
+      if (t < 25) {
+        const frac = _easeInQuad((t - 22) / 3);
+        shipSY = aboveSY + (landedSY - aboveSY) * frac;
+      } else if (t < 26) {
+        shipSY = landedSY;
+      } else {
+        const frac = _easeOutQuad((t - 26) / 3);
+        shipSY = landedSY + (aboveSY - landedSY) * frac;
+      }
+      this._renderTransportShip(ctx, shipSY, shackCenterSX);
+    }
+  }
+
+  _renderLaserPulse(ctx, sx, sy, laserTimer) {
+    const alpha = Math.sin(Math.min(laserTimer / 1.5, 1) * Math.PI);
+    if (alpha <= 0) return;
+
+    const beamX = sx + 4 * TILE_SIZE; // center of 4-tile landing pad
+    const beamY1 = sy;
+    const beamY0 = sy - 200;
+
+    ctx.save();
+
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.strokeStyle = '#9bdcff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(beamX, beamY0);
+    ctx.lineTo(beamX, beamY1);
+    ctx.stroke();
+
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(beamX, beamY0);
+    ctx.lineTo(beamX, beamY1);
+    ctx.stroke();
+
+    ctx.restore();
   }
 }
 

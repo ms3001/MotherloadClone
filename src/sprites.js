@@ -298,12 +298,105 @@ function drawGasPump(ctx) {
   ctx.fillRect(6 * PX, 31 * PX, 20 * PX, 1 * PX);
 }
 
+function drawOreShack(ctx) {
+  // 192×64 canvas, logical 96×32 @ PX=2
+  rect(ctx, 0, 0, 96, 32, '#6b4a2a');
+  // Vertical plank seams
+  for (let lx = 8; lx < 96; lx += 8) {
+    rect(ctx, lx, 0, 1, 32, '#3a2010');
+  }
+  // Roof (peaked, asymmetric — peak at logical x=30)
+  for (let row = 0; row < 10; row++) {
+    const lx = Math.max(0, Math.round(30 - row * 3.2));
+    const rr = Math.min(96, Math.round(30 + row * 2.5));
+    rect(ctx, lx, row, rr - lx, 1, '#4a3010');
+  }
+  rect(ctx, 28, 0, 4, 1, '#7a5830'); // peak highlight
+  rect(ctx, 0, 10, 96, 2, '#3a2010'); // eave shadow
+  // Broken window (left)
+  rect(ctx, 10, 14, 14, 10, '#1a2233');
+  rect(ctx, 10, 14,  1, 10, '#3a2010');
+  rect(ctx, 10, 14, 14,  1, '#3a2010');
+  rect(ctx, 15, 14,  1,  5, '#2a1a10');
+  // Door (right)
+  rect(ctx, 76, 16, 14, 16, '#1a0f08');
+  rect(ctx, 76, 14, 14,  2, '#3a2010');
+  rect(ctx, 76, 14,  2, 18, '#3a2010');
+  rect(ctx, 88, 14,  2, 18, '#3a2010');
+  // Weathering spots
+  rect(ctx,  3, 18,  2, 1, '#2a1a0a');
+  rect(ctx, 45, 22,  3, 1, '#2a1a0a');
+  rect(ctx, 60, 17,  1, 2, '#2a1a0a');
+  rect(ctx, 35, 28,  4, 1, '#2a1a0a');
+}
+
+function drawOreStorage(ctx) {
+  // 64×64 canvas, logical 32×32 @ PX=2
+  rect(ctx, 0, 0, 32, 32, '#2d3748');
+  rect(ctx, 1, 1, 30, 30, '#4a5568');
+  rect(ctx,  0,  0, 32,  1, '#9ba8b8');
+  rect(ctx,  0,  0,  1, 32, '#9ba8b8');
+  rect(ctx, 31,  0,  1, 32, '#1c2030');
+  rect(ctx,  0, 31, 32,  1, '#1c2030');
+  // Yellow label strip
+  rect(ctx, 2, 2, 28, 6, '#ffd166');
+  rect(ctx, 2, 2, 28, 1, '#ffe899');
+  rect(ctx, 2, 7, 28, 1, '#c8a030');
+  // Label marks (suggesting "ORE")
+  rect(ctx,  4, 4, 4, 2, '#3a2a00');
+  rect(ctx, 10, 4, 4, 2, '#3a2a00');
+  rect(ctx, 16, 4, 4, 2, '#3a2a00');
+  // Slot hatch marks
+  for (let lx = 3; lx < 30; lx += 5) {
+    rect(ctx, lx, 12, 3, 16, '#2d3748');
+  }
+  rect(ctx, 2, 11, 28, 1, '#3a4460');
+  // Bolt corners
+  px(ctx,  2,  9, '#1c2030');
+  px(ctx, 29,  9, '#1c2030');
+  px(ctx,  2, 29, '#1c2030');
+  px(ctx, 29, 29, '#1c2030');
+}
+
+function drawOrePad(ctx) {
+  // 128×64 canvas, logical 64×32 @ PX=2
+  rect(ctx, 0, 0, 64, 32, '#2a2d36');
+  rect(ctx, 0, 0, 64,  1, '#8a909c');
+  // Grid lines
+  for (let ly = 8; ly < 32; ly += 8) rect(ctx, 0, ly, 64, 1, '#1c1e25');
+  for (let lx = 8; lx < 64; lx += 8) rect(ctx, lx, 0,  1, 32, '#1c1e25');
+  // Landing circle (center 32,16, r=9)
+  const cx = 32, cy = 16, r = 9;
+  for (let dy = -r; dy <= r; dy++) {
+    const hw = Math.round(Math.sqrt(r * r - dy * dy));
+    rect(ctx, cx - hw, cy + dy, hw * 2, 1, '#3a3f4a');
+  }
+  for (let dy = -(r - 2); dy <= r - 2; dy++) {
+    const hw2 = Math.round(Math.sqrt((r - 2) * (r - 2) - dy * dy));
+    rect(ctx, cx - hw2, cy + dy, hw2 * 2, 1, '#2a2d36');
+  }
+  // Crosshair
+  rect(ctx, cx - 1, cy - r + 1, 2, r * 2 - 1, '#4a4f5a');
+  rect(ctx, cx - r + 1, cy - 1, r * 2 - 1, 2, '#4a4f5a');
+  // Corner lights
+  for (const [lx, ly] of [[3, 3], [3, 27], [59, 3], [59, 27]]) {
+    rect(ctx, lx, ly, 2, 2, '#9ba8b8');
+    rect(ctx, lx, ly, 2, 1, '#c8d4e0');
+  }
+  rect(ctx, 0,  0,  1, 32, '#8a909c');
+  rect(ctx, 0, 31, 64,  1, '#1c1e25');
+  rect(ctx, 63, 0,  1, 32, '#1c1e25');
+}
+
 export function buildSprites() {
   const sprites = {
     tiles: {},
     digger: {},
     gasPump: null,
     spawnFlag: null,
+    oreShack: null,
+    oreStorage: null,
+    orePad: null,
   };
 
   // Tile sprites
@@ -350,6 +443,29 @@ export function buildSprites() {
   pumpCtx.imageSmoothingEnabled = false;
   drawGasPump(pumpCtx);
   sprites.gasPump = pumpC;
+
+  // Ore shack (192×64, 96×32 logical @ PX=2)
+  const shackC = document.createElement('canvas');
+  shackC.width = 192; shackC.height = 64;
+  const shackCtx = shackC.getContext('2d');
+  shackCtx.imageSmoothingEnabled = false;
+  drawOreShack(shackCtx);
+  sprites.oreShack = shackC;
+
+  // Ore storage bin (64×64, 32×32 logical @ PX=2)
+  const storageC = makeCanvas(64);
+  const storageCtx = storageC.getContext('2d');
+  storageCtx.imageSmoothingEnabled = false;
+  drawOreStorage(storageCtx);
+  sprites.oreStorage = storageC;
+
+  // Landing pad (128×64, 64×32 logical @ PX=2)
+  const padC = document.createElement('canvas');
+  padC.width = 128; padC.height = 64;
+  const padCtx = padC.getContext('2d');
+  padCtx.imageSmoothingEnabled = false;
+  drawOrePad(padCtx);
+  sprites.orePad = padC;
 
   // Digger variants — index by [facing][stateKey][frame]
   const DIGGER_STATES = [
