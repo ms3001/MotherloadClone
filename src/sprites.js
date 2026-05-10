@@ -416,6 +416,85 @@ function drawRepairShack(ctx) {
   rect(ctx, 38, 17, 1, 2, '#2a1a0a');
 }
 
+function drawUpgradeShack(ctx) {
+  // 160×64 canvas, logical 80×32 @ PX=2
+  rect(ctx, 0, 0, 80, 32, '#6b4a2a');
+  for (let lx = 8; lx < 80; lx += 8) rect(ctx, lx, 0, 1, 32, '#3a2010');
+  // Asymmetric peaked roof, peak at x=36
+  for (let row = 0; row < 10; row++) {
+    const lx = Math.max(0, Math.round(36 - row * 3.8));
+    const rr = Math.min(80, Math.round(36 + row * 2.2));
+    rect(ctx, lx, row, rr - lx, 1, row % 2 === 0 ? '#3a2010' : '#5a3a1a');
+  }
+  rect(ctx, 34, 0, 4, 1, '#7a5830');
+  rect(ctx, 0, 10, 80, 2, '#3a2010');
+  // Broken window left
+  rect(ctx, 8, 14, 10, 9, '#0a0810');
+  rect(ctx, 8, 14, 1, 9, '#3a2010');
+  rect(ctx, 8, 14, 10, 1, '#3a2010');
+  rect(ctx, 13, 14, 1, 5, '#2a1a10');
+  rect(ctx, 9, 17, 4, 1, '#2a1a10');
+  // Broken window right
+  rect(ctx, 50, 14, 10, 9, '#0a0810');
+  rect(ctx, 50, 14, 1, 9, '#3a2010');
+  rect(ctx, 50, 14, 10, 1, '#3a2010');
+  rect(ctx, 55, 14, 1, 5, '#2a1a10');
+  rect(ctx, 51, 17, 4, 1, '#2a1a10');
+  // Central door
+  rect(ctx, 36, 20, 8, 12, '#0d0a08');
+  rect(ctx, 36, 18, 8, 2, '#3a2010');
+  rect(ctx, 36, 18, 1, 14, '#3a2010');
+  rect(ctx, 43, 18, 1, 14, '#3a2010');
+  // Weathering
+  rect(ctx,  3, 18, 2, 1, '#2a1a0a');
+  rect(ctx, 28, 25, 3, 1, '#2a1a0a');
+  rect(ctx, 65, 20, 1, 2, '#2a1a0a');
+  rect(ctx, 18, 28, 4, 1, '#2a1a0a');
+}
+
+function drawUpgradeLab(ctx) {
+  // 160×64 canvas, logical 80×32 @ PX=2
+  // Left pillar
+  rect(ctx, 0, 0, 7, 32, '#2a303d');
+  rect(ctx, 5, 0, 1, 32, '#006a7a');
+  rect(ctx, 0, 0, 7, 1, '#5a6280');
+  rect(ctx, 1, 8,  5, 1, '#1a1e28');
+  rect(ctx, 1, 16, 5, 1, '#1a1e28');
+  rect(ctx, 1, 24, 5, 1, '#1a1e28');
+  // Right pillar
+  rect(ctx, 72, 0, 8, 32, '#2a303d');
+  rect(ctx, 73, 0, 1, 32, '#006a7a');
+  rect(ctx, 72, 0, 8, 1, '#5a6280');
+  rect(ctx, 73, 8,  5, 1, '#1a1e28');
+  rect(ctx, 73, 16, 5, 1, '#1a1e28');
+  rect(ctx, 73, 24, 5, 1, '#1a1e28');
+  // Ceiling
+  rect(ctx, 7, 0, 65, 3, '#1a1e28');
+  rect(ctx, 7, 1, 65, 1, '#3a4055');
+  // Interior background
+  rect(ctx, 7, 3, 65, 29, '#0d0f18');
+  // Left terminal
+  rect(ctx, 12, 8, 9, 14, '#2a3040');
+  rect(ctx, 13, 9, 7, 12, '#001a28');
+  rect(ctx, 13, 9, 7, 1, '#00a8cc');
+  // Right terminal
+  rect(ctx, 58, 8, 9, 14, '#2a3040');
+  rect(ctx, 59, 9, 7, 12, '#001a28');
+  rect(ctx, 59, 9, 7, 1, '#00a8cc');
+  // Central fabricator
+  rect(ctx, 34, 7, 12, 17, '#003a4a');
+  rect(ctx, 35, 8, 10, 15, '#0d1f3a');
+  rect(ctx, 34, 7,  12, 1, '#00ccff');
+  rect(ctx, 34, 23, 12, 1, '#00ccff');
+  // Antenna
+  rect(ctx, 39, 3, 1, 4, '#3a6090');
+  // Floor
+  rect(ctx, 7, 25, 65, 7, '#151820');
+  for (let lx of [16, 24, 32, 40, 48, 56, 64]) rect(ctx, lx, 25, 1, 7, '#1e2230');
+  rect(ctx, 7, 25, 65, 1, '#002a30');
+  rect(ctx, 7, 26, 65, 1, '#002a30');
+}
+
 function drawRepairGarage(ctx) {
   // 128×64 canvas, logical 64×32 @ PX=2 — cyberpunk/martian repair bay
   rect(ctx, 0, 0, 64, 32, '#0e1118');
@@ -496,6 +575,8 @@ export function buildSprites() {
     orePad: null,
     repairShack: null,
     repairGarage: null,
+    upgradeShack: null,
+    upgradeLab: null,
   };
 
   // Tile sprites
@@ -581,6 +662,22 @@ export function buildSprites() {
   repairGarageCtx.imageSmoothingEnabled = false;
   drawRepairGarage(repairGarageCtx);
   sprites.repairGarage = repairGarageC;
+
+  // Upgrade shack (160×64, 80×32 logical @ PX=2)
+  const upgradeShackC = document.createElement('canvas');
+  upgradeShackC.width = 160; upgradeShackC.height = 64;
+  const upgradeShackCtx = upgradeShackC.getContext('2d');
+  upgradeShackCtx.imageSmoothingEnabled = false;
+  drawUpgradeShack(upgradeShackCtx);
+  sprites.upgradeShack = upgradeShackC;
+
+  // Upgrade lab (160×64, 80×32 logical @ PX=2)
+  const upgradeLabC = document.createElement('canvas');
+  upgradeLabC.width = 160; upgradeLabC.height = 64;
+  const upgradeLabCtx = upgradeLabC.getContext('2d');
+  upgradeLabCtx.imageSmoothingEnabled = false;
+  drawUpgradeLab(upgradeLabCtx);
+  sprites.upgradeLab = upgradeLabC;
 
   // Digger variants — index by [facing][stateKey][frame]
   const DIGGER_STATES = [

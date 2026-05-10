@@ -24,6 +24,17 @@ const REPAIR_PRICE_PER_HP    = 5;   // credits per HP
 const REPAIR_COPPER_COST     = 20;
 const REPAIR_CREDIT_COST     = 100;
 
+const LAB_TRIGGER_PADDING = 12;
+const LAB_BUILD_DURATION  = DEPOT_BUILD_DURATION;
+const LAB_COPPER_COST     = 12;
+const LAB_IRON_COST       = 12;
+const LAB_CREDIT_COST     = 200;
+
+const DRILLER_SLOTS = ['drill', 'fuelTank', 'hull', 'thermal', 'storage', 'engine', 'radar', 'wallet'];
+const SLOT_LABELS   = { drill: 'Drill', fuelTank: 'Fuel', hull: 'Hull', thermal: 'Thermal', storage: 'Cargo', engine: 'Engine', radar: 'Radar', wallet: 'Wallet' };
+const ORE_ABBREV    = { copper: 'Cu', iron: 'Fe', silver: 'Ag', gold: 'Au', platinum: 'Pt', cobalt: 'Co', tungsten: 'W', emerald: 'Em', ruby: 'Rb', diamond: 'Di' };
+const RARITY_COLS   = ['#c0c4cc', '#6a6e78', '#3cb371', '#4a90d9', '#9966cc', '#ffd166', '#e63946'];
+
 const ORE_BY_KEY = new Map(ORES.map(o => [o.key, o]));
 
 function _easeInQuad(t)  { return t * t; }
@@ -96,6 +107,19 @@ export class Game {
     };
     this._initRepairShopTiles();
 
+    // Upgrade lab: 5 tiles wide, 5 tiles left of spawn flag
+    this.upgradeLab = {
+      tx: spawnTx - 10, ty: SURFACE_ROW - 2, w: 5, h: 2,
+      state: 'shack',
+      buildTimer: 0,
+      flashMsg: '', flashTimer: 0,
+      playerNear: false,
+      panelOpen: false,
+      panelRow: 0,
+      buyFlash: { row: -1, timer: 0 },
+    };
+    this._initUpgradeLabTiles();
+
     // Spawn marker: one concrete block at the surface under spawn
     this.world.set(spawnTx, SURFACE_ROW, TILE.CONCRETE);
     this.spawnFlagX = spawnTx * TILE_SIZE;
@@ -167,6 +191,7 @@ export class Game {
     this._updateRefuel(dt);
     this._updateOreDepot(dt);
     this._updateRepairShop(dt);
+    this._updateUpgradeLab(dt);
 
     const flagCx = this.spawnFlagX + TILE_SIZE / 2;
     const flagCy = this.spawnFlagY - this.sprites.spawnFlag.height;
@@ -178,7 +203,10 @@ export class Game {
     this.camera.follow(this.digger.x, this.digger.y);
     this.hud.update(this.digger, this.world, dt);
 
-    if (this.input.pressed('tab')) this.inventory.toggle();
+    if (this.input.pressed('tab')) {
+      if (this.upgradeLab.panelOpen) this.upgradeLab.panelOpen = false;
+      else this.inventory.toggle();
+    }
     this.inventory.update(this.digger);
 
     this.input.endFrame();
@@ -276,6 +304,8 @@ export class Game {
     const shop = this.repairShop;
     const shopSave = { state: shop.state, buildTimer: shop.buildTimer };
 
+    const lab = this.upgradeLab;
+
     const save = {
       v: 1,
       seed: this.world.seed,
@@ -290,6 +320,7 @@ export class Game {
       },
       depot: depotSave,
       repairShop: shopSave,
+      upgradeLab: { state: lab.state, buildTimer: lab.buildTimer },
       diff,
     };
     localStorage.setItem('motherload_save', JSON.stringify(save));
@@ -307,6 +338,7 @@ export class Game {
     }
     this._initDepotTiles();
     this._initRepairShopTiles();
+    this._initUpgradeLabTiles();
     this.world.set(spawnTx, SURFACE_ROW, TILE.CONCRETE);
     // Apply player-made changes.
     for (const [i, v] of save.diff) this.world.tiles[i] = v;
@@ -327,6 +359,11 @@ export class Game {
     if (save.repairShop) {
       this.repairShop.state = save.repairShop.state ?? 'shack';
       this.repairShop.buildTimer = save.repairShop.buildTimer ?? 0;
+    }
+
+    if (save.upgradeLab) {
+      this.upgradeLab.state = save.upgradeLab.state ?? 'shack';
+      this.upgradeLab.buildTimer = save.upgradeLab.buildTimer ?? 0;
     }
 
     this.digger.world = this.world;
@@ -440,6 +477,8 @@ export class Game {
 
     this._renderOreDepot();
     this._renderRepairShop();
+    this._renderUpgradeLab();
+    if (this.upgradeLab.panelOpen) this._renderUpgradePanel();
 
     // Spawn flag (drawn above the concrete spawn block)
     const flagSprite = this.sprites.spawnFlag;
@@ -1046,6 +1085,350 @@ export class Game {
     ctx.fillText(label, cx + 1, cy + 1);
     ctx.fillStyle = color;
     ctx.fillText(label, cx, cy);
+  }
+
+  _initUpgradeLabTiles() {
+    const lab = this.upgradeLab;
+    for (let dx = -1; dx < lab.w + 1; dx++) {
+      this.world.set(lab.tx + dx, lab.ty + lab.h, TILE.CONCRETE);
+    }
+    for (let dy = 0; dy < lab.h; dy++) {
+      for (let dx = 0; dx < lab.w; dx++) {
+        this.world.set(lab.tx + dx, lab.ty + dy, TILE.SKY);
+      }
+    }
+  }
+
+  _updateUpgradeLab(dt) {
+    const lab = this.upgradeLab;
+    const d   = this.digger;
+    if (d.dead) {
+      if (lab.panelOpen) lab.panelOpen = false;
+      return;
+    }
+
+    const b  = d.bbox;
+    const rx = lab.tx * TILE_SIZE - LAB_TRIGGER_PADDING;
+    const ry = lab.ty * TILE_SIZE - LAB_TRIGGER_PADDING;
+    const rw = lab.w  * TILE_SIZE + LAB_TRIGGER_PADDING * 2;
+    const rh = lab.h  * TILE_SIZE + LAB_TRIGGER_PADDING * 2;
+    lab.playerNear = b.x < rx + rw && b.x + b.w > rx && b.y < ry + rh && b.y + b.h > ry;
+
+    if (!lab.playerNear && lab.panelOpen) lab.panelOpen = false;
+    if (lab.flashTimer > 0) lab.flashTimer -= dt;
+    if (lab.buyFlash.timer > 0) lab.buyFlash.timer -= dt;
+
+    switch (lab.state) {
+      case 'shack': {
+        if (lab.playerNear && this.input.pressed('f')) {
+          const copper = d.cargo.get('copper') ?? 0;
+          const iron   = d.cargo.get('iron')   ?? 0;
+          if (copper >= LAB_COPPER_COST && iron >= LAB_IRON_COST && d.money >= LAB_CREDIT_COST) {
+            const newCu = copper - LAB_COPPER_COST;
+            const newFe = iron   - LAB_IRON_COST;
+            if (newCu <= 0) d.cargo.delete('copper'); else d.cargo.set('copper', newCu);
+            if (newFe <= 0) d.cargo.delete('iron');   else d.cargo.set('iron',   newFe);
+            d.cargoUsed = Math.max(0, d.cargoUsed - LAB_COPPER_COST - LAB_IRON_COST);
+            d.money     = Math.max(0, d.money - LAB_CREDIT_COST);
+            lab.state = 'constructing';
+            lab.buildTimer = 0;
+          } else {
+            const missing = [];
+            if (copper < LAB_COPPER_COST) missing.push(`${LAB_COPPER_COST} Cu`);
+            if (iron   < LAB_IRON_COST)   missing.push(`${LAB_IRON_COST} Fe`);
+            if (d.money < LAB_CREDIT_COST) missing.push(`$${LAB_CREDIT_COST}`);
+            lab.flashMsg   = 'NEED ' + missing.join(' + ');
+            lab.flashTimer = 2.5;
+          }
+        }
+        break;
+      }
+
+      case 'constructing': {
+        lab.buildTimer += dt;
+        if (lab.buildTimer >= LAB_BUILD_DURATION) {
+          lab.buildTimer = LAB_BUILD_DURATION;
+          lab.state = 'lab';
+        }
+        break;
+      }
+
+      case 'lab': {
+        if (lab.panelOpen) {
+          if (this.input.pressed('escape') || this.input.pressed('tab')) {
+            lab.panelOpen = false;
+          } else {
+            if (this.input.pressed('arrowup'))
+              lab.panelRow = (lab.panelRow - 1 + DRILLER_SLOTS.length) % DRILLER_SLOTS.length;
+            if (this.input.pressed('arrowdown'))
+              lab.panelRow = (lab.panelRow + 1) % DRILLER_SLOTS.length;
+            if (this.input.pressed('f'))
+              this._purchaseUpgrade(lab.panelRow);
+          }
+        } else if (lab.playerNear && this.input.pressed('f')) {
+          lab.panelOpen = true;
+          lab.panelRow  = 0;
+        }
+        break;
+      }
+    }
+  }
+
+  _purchaseUpgrade(rowIdx) {
+    const lab  = this.upgradeLab;
+    const d    = this.digger;
+    const slot = DRILLER_SLOTS[rowIdx];
+    const tiers = UPGRADES[slot];
+    const curIdx = tiers.indexOf(d.attachments[slot]);
+    if (curIdx < 0 || curIdx >= tiers.length - 1) return;
+    const next = tiers[curIdx + 1];
+    if (!this._canAffordUpgrade(next, d)) {
+      lab.flashMsg   = 'INSUFFICIENT RESOURCES';
+      lab.flashTimer = 2;
+      return;
+    }
+    for (const [key, count] of Object.entries(next.cost ?? {})) {
+      const ore = ORE_BY_KEY.get(key);
+      const had = d.cargo.get(key) ?? 0;
+      const rem = had - count;
+      if (rem <= 0) d.cargo.delete(key); else d.cargo.set(key, rem);
+      if (ore) d.cargoUsed = Math.max(0, d.cargoUsed - count * ore.weight);
+    }
+    d.money = Math.max(0, d.money - (next.credits ?? 0));
+    d.attachments[slot] = next;
+    d._applyAttachmentStats();
+    lab.buyFlash = { row: rowIdx, timer: 0.7 };
+  }
+
+  _canAffordUpgrade(tier, d) {
+    for (const [key, count] of Object.entries(tier.cost ?? {})) {
+      if ((d.cargo.get(key) ?? 0) < count) return false;
+    }
+    return d.money >= (tier.credits ?? 0);
+  }
+
+  _renderUpgradeLab() {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const lab = this.upgradeLab;
+    const camX = Math.round(cam.x);
+    const camY = Math.round(cam.y);
+
+    const sx  = lab.tx * TILE_SIZE - camX;
+    const sy  = lab.ty * TILE_SIZE - camY;
+    const spw = lab.w * TILE_SIZE;
+    const sph = lab.h * TILE_SIZE;
+    if (sx + spw < 0 || sx > cam.viewW || sy + sph < 0 || sy > cam.viewH) return;
+
+    if (lab.state === 'shack' || lab.state === 'constructing') {
+      ctx.drawImage(this.sprites.upgradeShack, sx, sy);
+      if (lab.state === 'constructing') {
+        this._renderConstructionShips(ctx, cam, sx, sy, lab.buildTimer, lab.w);
+        this._renderProgressBar(ctx, sx, sy, spw, lab.buildTimer / LAB_BUILD_DURATION);
+      }
+    } else {
+      ctx.drawImage(this.sprites.upgradeLab, sx, sy);
+    }
+
+    if (lab.playerNear && !lab.panelOpen) this._renderUpgradeLabLabel(ctx, sx, sy);
+  }
+
+  _renderUpgradeLabLabel(ctx, sx, sy) {
+    const lab = this.upgradeLab;
+    const cx  = sx + lab.w * TILE_SIZE / 2;
+    let cy    = sy - 6;
+
+    ctx.font = 'bold 12px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+
+    let label, color, sub, subColor;
+    if (lab.state === 'shack') {
+      if (lab.flashTimer > 0) {
+        label = lab.flashMsg; color = '#e63946';
+      } else {
+        label = '[F] BUILD UPGRADE LAB'; color = '#ffd166';
+        sub = `${LAB_COPPER_COST}Cu  ${LAB_IRON_COST}Fe  $${LAB_CREDIT_COST}`; subColor = '#c8a030';
+      }
+    } else if (lab.state === 'constructing') {
+      label = 'CONSTRUCTING...'; color = '#a8e6a0';
+    } else {
+      label = '[F] UPGRADE SHOP'; color = '#a0c8ff';
+    }
+
+    if (sub) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(sub, cx + 1, cy + 1);
+      ctx.fillStyle = subColor;           ctx.fillText(sub, cx, cy);
+      cy -= 16;
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(label, cx + 1, cy + 1);
+    ctx.fillStyle = color;              ctx.fillText(label, cx, cy);
+  }
+
+  _renderUpgradePanel() {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const lab = this.upgradeLab;
+    const d   = this.digger;
+
+    const PW = Math.min(720, cam.viewW - 40);
+    const ROW_H = 46;
+    const PH = 56 + DRILLER_SLOTS.length * ROW_H + 30;
+    const px = (cam.viewW - PW) / 2;
+    const py = (cam.viewH - PH) / 2;
+    const PAD = 16;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.82)';
+    ctx.fillRect(0, 0, cam.viewW, cam.viewH);
+
+    ctx.fillStyle = '#080c14';
+    ctx.strokeStyle = '#2a5a8a';
+    ctx.lineWidth = 2;
+    ctx.fillRect(px, py, PW, PH);
+    ctx.strokeRect(px + 1, py + 1, PW - 2, PH - 2);
+
+    ctx.font = 'bold 15px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#a0c8ff';
+    ctx.fillText('UPGRADE FACILITY', px + PW / 2, py + 18);
+
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.fillStyle = '#4a6a8a';
+    ctx.fillText('↑↓ Navigate   [F] Purchase   [Esc] Close', px + PW / 2, py + 36);
+
+    ctx.strokeStyle = '#1a3a5a';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px + PAD, py + 48); ctx.lineTo(px + PW - PAD, py + 48); ctx.stroke();
+
+    for (let i = 0; i < DRILLER_SLOTS.length; i++) {
+      const slot    = DRILLER_SLOTS[i];
+      const tiers   = UPGRADES[slot];
+      const curIdx  = tiers.indexOf(d.attachments[slot]);
+      const next    = curIdx < tiers.length - 1 ? tiers[curIdx + 1] : null;
+      const canBuy  = next ? this._canAffordUpgrade(next, d) : false;
+      const isMax   = !next;
+      const isSelected = i === lab.panelRow;
+      const isFlash = lab.buyFlash.row === i && lab.buyFlash.timer > 0;
+
+      const ry = py + 52 + i * ROW_H;
+
+      if (isFlash) {
+        ctx.fillStyle = `rgba(0,200,80,${0.15 + 0.15 * (lab.buyFlash.timer / 0.7)})`;
+      } else if (isSelected) {
+        ctx.fillStyle = 'rgba(40,80,140,0.4)';
+      } else {
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+      }
+      ctx.fillRect(px + 2, ry, PW - 4, ROW_H);
+
+      if (isSelected) {
+        ctx.strokeStyle = '#2a5a8a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + 2, ry, PW - 4, ROW_H);
+      }
+
+      const cy = ry + ROW_H / 2;
+      const dimAlpha = isMax ? 0.4 : (canBuy ? 1.0 : 0.6);
+      ctx.globalAlpha = dimAlpha;
+
+      const rCol = RARITY_COLS[Math.min(curIdx, RARITY_COLS.length - 1)];
+      ctx.font = 'bold 11px ui-monospace, monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = rCol;
+      ctx.fillText(SLOT_LABELS[slot] ?? slot, px + PAD + 62, cy);
+
+      ctx.fillStyle = '#2a4060';
+      ctx.fillRect(px + PAD + 66, ry + 4, 1, ROW_H - 8);
+
+      ctx.font = '11px ui-monospace, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#8aa8c8';
+      const curName = tiers[curIdx]?.name ?? '—';
+      ctx.fillText(curName, px + PAD + 70, cy);
+
+      if (isMax) {
+        ctx.font = 'bold 11px ui-monospace, monospace';
+        ctx.fillStyle = '#00ccaa';
+        ctx.textAlign = 'center';
+        ctx.fillText('MAX TIER', px + PAD + 300 * (PW / 720), cy);
+      } else {
+        ctx.font = '12px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#3a6080';
+        ctx.fillText('→', px + PAD + 214 * (PW / 720), cy);
+
+        ctx.font = 'bold 11px ui-monospace, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = isSelected ? '#e0f0ff' : '#c0d8f0';
+        ctx.fillText(next.name, px + PAD + 224 * (PW / 720), cy);
+
+        ctx.font = '10px ui-monospace, monospace';
+        ctx.fillStyle = '#6a9aaa';
+        const statStr = this._upgradeStatStr(slot, next);
+        ctx.fillText(statStr, px + PAD + 374 * (PW / 720), cy);
+
+        this._renderUpgradeCost(ctx, next, d, px + PW - PAD, cy, PW / 720);
+      }
+
+      ctx.globalAlpha = 1;
+    }
+
+    const footY = py + 52 + DRILLER_SLOTS.length * ROW_H;
+    ctx.strokeStyle = '#1a3a5a'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px + PAD, footY); ctx.lineTo(px + PW - PAD, footY); ctx.stroke();
+
+    if (lab.flashTimer > 0) {
+      ctx.font = 'bold 12px ui-monospace, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#e63946';
+      ctx.fillText(lab.flashMsg, px + PW / 2, footY + 15);
+    }
+  }
+
+  _upgradeStatStr(slot, tier) {
+    switch (slot) {
+      case 'drill':    return `×${tier.power} pwr · T${tier.drillTier}`;
+      case 'fuelTank': return `${tier.capacity} fuel`;
+      case 'hull':     return `${tier.hp} HP`;
+      case 'thermal':  return `${Math.round(tier.reduction * 100)}% resist`;
+      case 'storage':  return `${tier.capacity} wt`;
+      case 'engine':   return `${tier.lateralMax} spd`;
+      case 'radar':    return `${tier.range}t range`;
+      case 'wallet':   return `$${tier.capacity >= 1000 ? (tier.capacity/1000).toFixed(0)+'k' : tier.capacity} cap`;
+      default:         return '';
+    }
+  }
+
+  _renderUpgradeCost(ctx, tier, d, rightX, cy, scale) {
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.textBaseline = 'middle';
+    let x = rightX;
+
+    if (tier.credits) {
+      const str = `$${tier.credits.toLocaleString()}`;
+      const affordable = d.money >= tier.credits;
+      ctx.fillStyle = affordable ? '#ffd166' : '#883322';
+      ctx.textAlign = 'right';
+      ctx.fillText(str, x, cy);
+      x -= ctx.measureText(str).width + 6 * scale;
+    }
+
+    const entries = Object.entries(tier.cost ?? {});
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const [key, count] = entries[i];
+      const ore = ORE_BY_KEY.get(key);
+      const has = d.cargo.get(key) ?? 0;
+      const affordable = has >= count;
+      const abbrev = ORE_ABBREV[key] ?? key.slice(0, 2);
+      const str = `${count}${abbrev}`;
+      ctx.fillStyle = affordable ? (ore?.color ?? '#aaa') : '#553333';
+      ctx.textAlign = 'right';
+      ctx.fillText(str, x, cy);
+      x -= ctx.measureText(str).width + 5 * scale;
+    }
   }
 }
 
