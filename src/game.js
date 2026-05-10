@@ -11,24 +11,21 @@ import { Inventory } from './inventory.js';
 
 const REFUEL_RATE = 40;
 const PUMP_TRIGGER_PADDING = 12;
+const FACILITY_TRIGGER_PADDING = 12;
 
-const DEPOT_TRIGGER_PADDING = 12;
-const DEPOT_SELL_RATE       = 2.5;
-const DEPOT_BUILD_DURATION  = 10;
-const COPPER_BUILD_COST     = 10;
-const SHIP_OFFSCREEN_Y      = 0; // world-y at sky top, always above viewport
+const DEPOT_SELL_RATE   = 2.5;
+const BUILD_DURATION    = 10;
+const COPPER_BUILD_COST = 10;
+const SHIP_OFFSCREEN_Y  = 0; // world-y at sky top, always above viewport
 
-const REPAIR_TRIGGER_PADDING = 12;
-const REPAIR_RATE            = 20;  // HP/sec while holding F
-const REPAIR_PRICE_PER_HP    = 5;   // credits per HP
-const REPAIR_COPPER_COST     = 20;
-const REPAIR_CREDIT_COST     = 100;
+const REPAIR_RATE         = 20;  // HP/sec while holding F
+const REPAIR_PRICE_PER_HP = 5;   // credits per HP
+const REPAIR_COPPER_COST  = 20;
+const REPAIR_CREDIT_COST  = 100;
 
-const LAB_TRIGGER_PADDING = 12;
-const LAB_BUILD_DURATION  = DEPOT_BUILD_DURATION;
-const LAB_COPPER_COST     = 12;
-const LAB_IRON_COST       = 12;
-const LAB_CREDIT_COST     = 200;
+const LAB_COPPER_COST = 12;
+const LAB_IRON_COST   = 12;
+const LAB_CREDIT_COST = 200;
 
 const DRILLER_SLOTS = ['drill', 'fuelTank', 'hull', 'thermal', 'storage', 'engine', 'radar', 'wallet'];
 const SLOT_LABELS   = { drill: 'Drill', fuelTank: 'Fuel', hull: 'Hull', thermal: 'Thermal', storage: 'Cargo', engine: 'Engine', radar: 'Radar', wallet: 'Wallet' };
@@ -92,7 +89,7 @@ export class Game {
       flashTimer: 0,
       playerNear: false,
     };
-    this._initDepotTiles();
+    this._initFacilityTiles(this.oreDepot);
 
     // Repair shop: 4 tiles wide, 3 tiles right of ore depot's right edge
     this.repairShop = {
@@ -105,7 +102,7 @@ export class Game {
       repairBought: 0,
       repairBoughtTimer: 0,
     };
-    this._initRepairShopTiles();
+    this._initFacilityTiles(this.repairShop);
 
     // Upgrade lab: 5 tiles wide, 5 tiles left of spawn flag
     this.upgradeLab = {
@@ -118,7 +115,7 @@ export class Game {
       panelRow: 0,
       buyFlash: { row: -1, timer: 0 },
     };
-    this._initUpgradeLabTiles();
+    this._initFacilityTiles(this.upgradeLab);
 
     // Spawn marker: one concrete block at the surface under spawn
     this.world.set(spawnTx, SURFACE_ROW, TILE.CONCRETE);
@@ -181,7 +178,10 @@ export class Game {
       return;
     }
 
-    this.digger.update(dt, this.input);
+    const digInput = this.upgradeLab.panelOpen
+      ? { down: k => (k === 'w' || k === 's') ? false : this.input.down(k), pressed: k => this.input.pressed(k) }
+      : this.input;
+    this.digger.update(dt, digInput);
 
     if (this.digger.dead && this.deathTimer <= 0) {
       this.deathTimer = this.deathDuration;
@@ -339,9 +339,9 @@ export class Game {
         this.world.set(gs.tx + dx, gs.ty + gs.h, TILE.CONCRETE);
       }
     }
-    this._initDepotTiles();
-    this._initRepairShopTiles();
-    this._initUpgradeLabTiles();
+    this._initFacilityTiles(this.oreDepot);
+    this._initFacilityTiles(this.repairShop);
+    this._initFacilityTiles(this.upgradeLab);
     this.world.set(spawnTx, SURFACE_ROW, TILE.CONCRETE);
     // Apply player-made changes.
     for (const [i, v] of save.diff) this.world.tiles[i] = v;
@@ -459,34 +459,21 @@ export class Game {
         const cx = sx + r.w / 2;
         const refueling = this.input.down('f');
         const action = refueling ? 'REFUELING' : '[F] REFUEL';
-        ctx.font = 'bold 12px ui-monospace, monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
+        this._setLabelFont(ctx);
         let cy = sy - 6;
         if (this.fuelBought > 0) {
-          const pumped = `+${Math.floor(this.fuelBought)} L pumped`;
-          ctx.fillStyle = 'rgba(0,0,0,0.6)';
-          ctx.fillText(pumped, cx + 1, cy + 1);
-          ctx.fillStyle = '#a8e6a0';
-          ctx.fillText(pumped, cx, cy);
+          this._drawLabel(ctx, `+${Math.floor(this.fuelBought)} L pumped`, cx, cy, '#a8e6a0');
           cy -= 16;
         }
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillText('$1/L', cx + 1, cy + 1);
-        ctx.fillStyle = '#c8a030';
-        ctx.fillText('$1/L', cx, cy);
+        this._drawLabel(ctx, '$1/L', cx, cy, '#c8a030');
         cy -= 16;
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillText(action, cx + 1, cy + 1);
-        ctx.fillStyle = '#ffd166';
-        ctx.fillText(action, cx, cy);
+        this._drawLabel(ctx, action, cx, cy, '#ffd166');
       }
     }
 
     this._renderOreDepot();
     this._renderRepairShop();
     this._renderUpgradeLab();
-    if (this.upgradeLab.panelOpen) this._renderUpgradePanel();
 
     // Spawn flag (drawn above the concrete spawn block)
     const flagSprite = this.sprites.spawnFlag;
@@ -495,15 +482,8 @@ export class Game {
     if (flagSx + flagSprite.width >= 0 && flagSx <= cam.viewW) {
       ctx.drawImage(flagSprite, flagSx, flagSy);
       if (this.nearFlag) {
-        const label = '[F] SAVE';
-        const cx = flagSx + flagSprite.width / 2;
-        ctx.font = 'bold 12px ui-monospace, monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillText(label, cx + 1, flagSy + 1);
-        ctx.fillStyle = '#ffd166';
-        ctx.fillText(label, cx, flagSy);
+        this._setLabelFont(ctx);
+        this._drawLabel(ctx, '[F] SAVE', flagSx + flagSprite.width / 2, flagSy, '#ffd166');
       }
     }
 
@@ -521,16 +501,47 @@ export class Game {
     const dx = Math.round(d.x + d.drillNudgeX - TILE_SIZE / 2 - camX);
     const dy = Math.round(d.y + d.drillNudgeY - TILE_SIZE / 2 + 2 - camY);
     ctx.drawImage(sprite, dx, dy);
+
+    if (this.upgradeLab.panelOpen) this._renderUpgradePanel();
   }
 
-  _initDepotTiles() {
-    const depot = this.oreDepot;
-    for (let dx = -1; dx < depot.w + 1; dx++) {
-      this.world.set(depot.tx + dx, depot.ty + depot.h, TILE.CONCRETE);
+  _checkProximity(facility) {
+    const b  = this.digger.bbox;
+    const rx = facility.tx * TILE_SIZE - FACILITY_TRIGGER_PADDING;
+    const ry = facility.ty * TILE_SIZE - FACILITY_TRIGGER_PADDING;
+    const rw = facility.w  * TILE_SIZE + FACILITY_TRIGGER_PADDING * 2;
+    const rh = facility.h  * TILE_SIZE + FACILITY_TRIGGER_PADDING * 2;
+    return b.x < rx + rw && b.x + b.w > rx && b.y < ry + rh && b.y + b.h > ry;
+  }
+
+  _tickConstruction(facility, dt, completedState) {
+    facility.buildTimer += dt;
+    if (facility.buildTimer >= BUILD_DURATION) {
+      facility.buildTimer = BUILD_DURATION;
+      facility.state = completedState;
     }
-    for (let dy = 0; dy < depot.h; dy++) {
-      for (let dx = 0; dx < depot.w; dx++) {
-        this.world.set(depot.tx + dx, depot.ty + dy, TILE.SKY);
+  }
+
+  _drawLabel(ctx, text, x, y, color) {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillText(text, x + 1, y + 1);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  _setLabelFont(ctx) {
+    ctx.font = 'bold 12px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+  }
+
+  _initFacilityTiles(f) {
+    for (let dx = -1; dx < f.w + 1; dx++) {
+      this.world.set(f.tx + dx, f.ty + f.h, TILE.CONCRETE);
+    }
+    for (let dy = 0; dy < f.h; dy++) {
+      for (let dx = 0; dx < f.w; dx++) {
+        this.world.set(f.tx + dx, f.ty + dy, TILE.SKY);
       }
     }
   }
@@ -540,12 +551,7 @@ export class Game {
     const d = this.digger;
     if (d.dead) return;
 
-    const b = d.bbox;
-    const rx = depot.tx * TILE_SIZE - DEPOT_TRIGGER_PADDING;
-    const ry = depot.ty * TILE_SIZE - DEPOT_TRIGGER_PADDING;
-    const rw = depot.w  * TILE_SIZE + DEPOT_TRIGGER_PADDING * 2;
-    const rh = depot.h  * TILE_SIZE + DEPOT_TRIGGER_PADDING * 2;
-    depot.playerNear = b.x < rx + rw && b.x + b.w > rx && b.y < ry + rh && b.y + b.h > ry;
+    depot.playerNear = this._checkProximity(depot);
 
     if (depot.flashTimer > 0) depot.flashTimer -= dt;
 
@@ -569,11 +575,7 @@ export class Game {
       }
 
       case 'constructing': {
-        depot.buildTimer += dt;
-        if (depot.buildTimer >= DEPOT_BUILD_DURATION) {
-          depot.buildTimer = DEPOT_BUILD_DURATION;
-          depot.state = 'depot';
-        }
+        this._tickConstruction(depot, dt, 'depot');
         break;
       }
 
@@ -691,7 +693,7 @@ export class Game {
       ctx.drawImage(this.sprites.oreShack, sx, sy);
       if (depot.state === 'constructing') {
         this._renderConstructionShips(ctx, cam, sx, sy, depot.buildTimer, depot.w);
-        this._renderProgressBar(ctx, sx, sy, spw, depot.buildTimer / DEPOT_BUILD_DURATION);
+        this._renderProgressBar(ctx, sx, sy, spw, depot.buildTimer / BUILD_DURATION);
       }
     } else {
       ctx.drawImage(this.sprites.oreStorage, sx, sy);
@@ -715,44 +717,29 @@ export class Game {
     const cx = sx + depot.w * TILE_SIZE / 2;
     let cy = sy - 6;
 
-    ctx.font = 'bold 12px ui-monospace, monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
+    this._setLabelFont(ctx);
 
     let label, color, sub, subColor;
     if (depot.state === 'shack') {
       if (depot.flashTimer > 0) { label = depot.flashMsg; color = '#e63946'; }
       else { label = '[F] BUILD ORE DEPOT'; color = '#ffd166'; sub = `${COPPER_BUILD_COST} copper`; subColor = '#c8a030'; }
     } else if (depot.state === 'constructing') {
-      label = 'CONSTRUCTING...';
-      color = '#a8e6a0';
+      label = 'CONSTRUCTING...'; color = '#a8e6a0';
     } else if (depot.state === 'depot') {
       const selling = this.input.down('f') && this.digger.cargoUsed > 0;
       label = selling ? 'SELLING ORE...' : '[F] SELL ORE';
       color = selling ? '#a8e6a0' : '#ffd166';
     } else if (depot.state === 'awaiting_ship' || depot.state === 'ship_inbound') {
-      label = 'SHIP EN ROUTE';
-      color = '#9bdcff';
+      label = 'SHIP EN ROUTE'; color = '#9bdcff';
     } else if (depot.state === 'ship_docked') {
-      label = 'SHIP DOCKED - WAIT';
-      color = '#ffd166';
+      label = 'SHIP DOCKED - WAIT'; color = '#ffd166';
     } else if (depot.state === 'ship_departing') {
-      label = 'DEPARTING...';
-      color = '#a8e6a0';
+      label = 'DEPARTING...'; color = '#a8e6a0';
     }
     if (!label) return;
 
-    if (sub) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillText(sub, cx + 1, cy + 1);
-      ctx.fillStyle = subColor;
-      ctx.fillText(sub, cx, cy);
-      cy -= 16;
-    }
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillText(label, cx + 1, cy + 1);
-    ctx.fillStyle = color;
-    ctx.fillText(label, cx, cy);
+    if (sub) { this._drawLabel(ctx, sub, cx, cy, subColor); cy -= 16; }
+    this._drawLabel(ctx, label, cx, cy, color);
   }
 
   _renderProgressBar(ctx, sx, sy, facilityPxW, progress) {
@@ -937,29 +924,13 @@ export class Game {
     ctx.restore();
   }
 
-  _initRepairShopTiles() {
-    const shop = this.repairShop;
-    for (let dx = -1; dx < shop.w + 1; dx++) {
-      this.world.set(shop.tx + dx, shop.ty + shop.h, TILE.CONCRETE);
-    }
-    for (let dy = 0; dy < shop.h; dy++) {
-      for (let dx = 0; dx < shop.w; dx++) {
-        this.world.set(shop.tx + dx, shop.ty + dy, TILE.SKY);
-      }
-    }
-  }
 
   _updateRepairShop(dt) {
     const shop = this.repairShop;
     const d = this.digger;
     if (d.dead) return;
 
-    const b = d.bbox;
-    const rx = shop.tx * TILE_SIZE - REPAIR_TRIGGER_PADDING;
-    const ry = shop.ty * TILE_SIZE - REPAIR_TRIGGER_PADDING;
-    const rw = shop.w  * TILE_SIZE + REPAIR_TRIGGER_PADDING * 2;
-    const rh = shop.h  * TILE_SIZE + REPAIR_TRIGGER_PADDING * 2;
-    shop.playerNear = b.x < rx + rw && b.x + b.w > rx && b.y < ry + rh && b.y + b.h > ry;
+    shop.playerNear = this._checkProximity(shop);
 
     if (shop.flashTimer > 0) shop.flashTimer -= dt;
 
@@ -989,11 +960,7 @@ export class Game {
       }
 
       case 'constructing': {
-        shop.buildTimer += dt;
-        if (shop.buildTimer >= DEPOT_BUILD_DURATION) {
-          shop.buildTimer = DEPOT_BUILD_DURATION;
-          shop.state = 'garage';
-        }
+        this._tickConstruction(shop, dt, 'garage');
         break;
       }
 
@@ -1037,7 +1004,7 @@ export class Game {
       ctx.drawImage(this.sprites.repairShack, sx, sy);
       if (shop.state === 'constructing') {
         this._renderConstructionShips(ctx, cam, sx, sy, shop.buildTimer, shop.w);
-        this._renderProgressBar(ctx, sx, sy, spw, shop.buildTimer / DEPOT_BUILD_DURATION);
+        this._renderProgressBar(ctx, sx, sy, spw, shop.buildTimer / BUILD_DURATION);
       }
     } else {
       ctx.drawImage(this.sprites.repairGarage, sx, sy);
@@ -1052,29 +1019,17 @@ export class Game {
     const cx = sx + shop.w * TILE_SIZE / 2;
     let cy = sy - 6;
 
-    ctx.font = 'bold 12px ui-monospace, monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
+    this._setLabelFont(ctx);
 
     let label, color, sub, subColor;
-
     if (shop.state === 'shack') {
-      if (shop.flashTimer > 0) {
-        label = shop.flashMsg;
-        color = '#e63946';
-      } else {
-        label = '[F] BUILD REPAIR SHOP';
-        color = '#ffd166';
-        sub = `${REPAIR_COPPER_COST} copper  +  $${REPAIR_CREDIT_COST}`;
-        subColor = '#c8a030';
-      }
+      if (shop.flashTimer > 0) { label = shop.flashMsg; color = '#e63946'; }
+      else { label = '[F] BUILD REPAIR SHOP'; color = '#ffd166'; sub = `${REPAIR_COPPER_COST} copper  +  $${REPAIR_CREDIT_COST}`; subColor = '#c8a030'; }
     } else if (shop.state === 'constructing') {
-      label = 'CONSTRUCTING...';
-      color = '#a8e6a0';
+      label = 'CONSTRUCTING...'; color = '#a8e6a0';
     } else {
       if (d.hull >= d.maxHull) {
-        label = 'HULL INTACT';
-        color = '#9bdcff';
+        label = 'HULL INTACT'; color = '#9bdcff';
       } else {
         const repairing = this.input.down('f') && d.money > 0;
         if (repairing) {
@@ -1089,31 +1044,10 @@ export class Game {
 
     if (!label) return;
 
-    if (sub) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillText(sub, cx + 1, cy + 1);
-      ctx.fillStyle = subColor;
-      ctx.fillText(sub, cx, cy);
-      cy -= 16;
-    }
-
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillText(label, cx + 1, cy + 1);
-    ctx.fillStyle = color;
-    ctx.fillText(label, cx, cy);
+    if (sub) { this._drawLabel(ctx, sub, cx, cy, subColor); cy -= 16; }
+    this._drawLabel(ctx, label, cx, cy, color);
   }
 
-  _initUpgradeLabTiles() {
-    const lab = this.upgradeLab;
-    for (let dx = -1; dx < lab.w + 1; dx++) {
-      this.world.set(lab.tx + dx, lab.ty + lab.h, TILE.CONCRETE);
-    }
-    for (let dy = 0; dy < lab.h; dy++) {
-      for (let dx = 0; dx < lab.w; dx++) {
-        this.world.set(lab.tx + dx, lab.ty + dy, TILE.SKY);
-      }
-    }
-  }
 
   _updateUpgradeLab(dt) {
     const lab = this.upgradeLab;
@@ -1123,12 +1057,7 @@ export class Game {
       return;
     }
 
-    const b  = d.bbox;
-    const rx = lab.tx * TILE_SIZE - LAB_TRIGGER_PADDING;
-    const ry = lab.ty * TILE_SIZE - LAB_TRIGGER_PADDING;
-    const rw = lab.w  * TILE_SIZE + LAB_TRIGGER_PADDING * 2;
-    const rh = lab.h  * TILE_SIZE + LAB_TRIGGER_PADDING * 2;
-    lab.playerNear = b.x < rx + rw && b.x + b.w > rx && b.y < ry + rh && b.y + b.h > ry;
+    lab.playerNear = this._checkProximity(lab);
 
     if (!lab.playerNear && lab.panelOpen) lab.panelOpen = false;
     if (lab.flashTimer > 0) lab.flashTimer -= dt;
@@ -1161,11 +1090,7 @@ export class Game {
       }
 
       case 'constructing': {
-        lab.buildTimer += dt;
-        if (lab.buildTimer >= LAB_BUILD_DURATION) {
-          lab.buildTimer = LAB_BUILD_DURATION;
-          lab.state = 'lab';
-        }
+        this._tickConstruction(lab, dt, 'lab');
         break;
       }
 
@@ -1240,7 +1165,7 @@ export class Game {
       ctx.drawImage(this.sprites.upgradeShack, sx, sy);
       if (lab.state === 'constructing') {
         this._renderConstructionShips(ctx, cam, sx, sy, lab.buildTimer, lab.w);
-        this._renderProgressBar(ctx, sx, sy, spw, lab.buildTimer / LAB_BUILD_DURATION);
+        this._renderProgressBar(ctx, sx, sy, spw, lab.buildTimer / BUILD_DURATION);
       }
     } else {
       ctx.drawImage(this.sprites.upgradeLab, sx, sy);
@@ -1254,31 +1179,20 @@ export class Game {
     const cx  = sx + lab.w * TILE_SIZE / 2;
     let cy    = sy - 6;
 
-    ctx.font = 'bold 12px ui-monospace, monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
+    this._setLabelFont(ctx);
 
     let label, color, sub, subColor;
     if (lab.state === 'shack') {
-      if (lab.flashTimer > 0) {
-        label = lab.flashMsg; color = '#e63946';
-      } else {
-        label = '[F] BUILD UPGRADE LAB'; color = '#ffd166';
-        sub = `${LAB_COPPER_COST} copper  +  ${LAB_IRON_COST} iron  +  $${LAB_CREDIT_COST}`; subColor = '#c8a030';
-      }
+      if (lab.flashTimer > 0) { label = lab.flashMsg; color = '#e63946'; }
+      else { label = '[F] BUILD UPGRADE LAB'; color = '#ffd166'; sub = `${LAB_COPPER_COST} copper  +  ${LAB_IRON_COST} iron  +  $${LAB_CREDIT_COST}`; subColor = '#c8a030'; }
     } else if (lab.state === 'constructing') {
       label = 'CONSTRUCTING...'; color = '#a8e6a0';
     } else {
       label = '[F] UPGRADE SHOP'; color = '#a0c8ff';
     }
 
-    if (sub) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(sub, cx + 1, cy + 1);
-      ctx.fillStyle = subColor;           ctx.fillText(sub, cx, cy);
-      cy -= 16;
-    }
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(label, cx + 1, cy + 1);
-    ctx.fillStyle = color;              ctx.fillText(label, cx, cy);
+    if (sub) { this._drawLabel(ctx, sub, cx, cy, subColor); cy -= 16; }
+    this._drawLabel(ctx, label, cx, cy, color);
   }
 
   _renderUpgradePanel() {
