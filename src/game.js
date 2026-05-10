@@ -14,8 +14,8 @@ const PUMP_TRIGGER_PADDING = 12;
 
 const DEPOT_TRIGGER_PADDING = 12;
 const DEPOT_SELL_RATE       = 2.5;
-const DEPOT_BUILD_DURATION  = 30;
-const COPPER_BUILD_COST     = 12;
+const DEPOT_BUILD_DURATION  = 10;
+const COPPER_BUILD_COST     = 10;
 const SHIP_OFFSCREEN_Y      = 0; // world-y at sky top, always above viewport
 
 const ORE_BY_KEY = new Map(ORES.map(o => [o.key, o]));
@@ -61,7 +61,7 @@ export class Game {
 
     // Ore depot: 6-tile-wide facility to the right of the gas station
     this.oreDepot = {
-      tx: spawnTx + 10, ty: SURFACE_ROW - 2, w: 6, h: 2,
+      tx: spawnTx + 13, ty: SURFACE_ROW - 2, w: 6, h: 2,
       state: 'shack',
       buildTimer: 0,
       sellAccum: 0,
@@ -643,7 +643,7 @@ export class Game {
 
     let label, color;
     if (depot.state === 'shack') {
-      label = depot.flashTimer > 0 ? depot.flashMsg : `[F] BUILD DEPOT (${COPPER_BUILD_COST} copper)`;
+      label = depot.flashTimer > 0 ? depot.flashMsg : `[F] BUILD ORE DEPOT (${COPPER_BUILD_COST} copper)`;
       color = depot.flashTimer > 0 ? '#e63946' : '#ffd166';
     } else if (depot.state === 'constructing') {
       label = 'CONSTRUCTING...';
@@ -822,20 +822,6 @@ export class Game {
       this._renderPickupShip(ctx, shipSY, shackCenterSX);
     }
 
-    if (t >= 22 && t < 29) {
-      const landedSY = sy - 40;
-      let shipSY;
-      if (t < 25) {
-        const frac = _easeInQuad((t - 22) / 3);
-        shipSY = aboveSY + (landedSY - aboveSY) * frac;
-      } else if (t < 26) {
-        shipSY = landedSY;
-      } else {
-        const frac = _easeOutQuad((t - 26) / 3);
-        shipSY = landedSY + (aboveSY - landedSY) * frac;
-      }
-      this._renderTransportShip(ctx, shipSY, shackCenterSX);
-    }
   }
 
   _renderLaserPulse(ctx, sx, sy, laserTimer) {

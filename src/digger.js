@@ -10,7 +10,8 @@ const LATERAL_AIR_ACCEL = 733;
 const GROUND_FRICTION = 1800; // px/s^2 deceleration when no input
 const AIR_DRAG = 200;
 
-const FUEL_THRUST_RATE = 8;    // units/sec while thrusting
+const FUEL_THRUST_RATE = 4;    // units/sec while thrusting (W)
+const FUEL_HOVER_RATE  = 8;    // units/sec while hovering (space)
 const FUEL_DRILL_RATE = 1.5;   // units/sec while drilling
 const FUEL_IDLE_RATE = 0.05;   // units/sec ambient
 const FALL_DAMAGE_THRESHOLD = 650;
@@ -128,7 +129,7 @@ export class Digger {
       this.fuel = Math.max(0, this.fuel - FUEL_THRUST_RATE * dt);
     } else if (hovering) {
       this.thrusting = true;
-      this.fuel = Math.max(0, this.fuel - FUEL_THRUST_RATE * dt);
+      this.fuel = Math.max(0, this.fuel - FUEL_HOVER_RATE * dt);
     } else {
       this.fuel = Math.max(0, this.fuel - FUEL_IDLE_RATE * dt);
     }
