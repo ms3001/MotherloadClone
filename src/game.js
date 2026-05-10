@@ -21,11 +21,11 @@ const SHIP_OFFSCREEN_Y  = 0; // world-y at sky top, always above viewport
 
 const REPAIR_RATE         = 20;  // HP/sec while holding F
 const REPAIR_PRICE_PER_HP = 5;   // credits per HP
-const REPAIR_COPPER_COST  = 20;
+const REPAIR_COPPER_COST  = 15;
 const REPAIR_CREDIT_COST  = 100;
 
-const LAB_COPPER_COST = 12;
-const LAB_IRON_COST   = 12;
+const LAB_COPPER_COST = 10;
+const LAB_IRON_COST   = 10;
 const LAB_CREDIT_COST = 200;
 
 const DRILLER_SLOTS = ['drill', 'fuelTank', 'hull', 'thermal', 'storage', 'engine', 'radar', 'wallet'];
