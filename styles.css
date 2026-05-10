@@ -187,7 +187,7 @@ html, body {
 .inv-value      { width: 68px; text-align: right; color: #ffd166; }
 
 .inv-slot-label { width: 72px; color: #8a93a6; font-size: 11px; }
-.inv-part-name  { flex: 1; color: #d0d4de; }
+.inv-part-name  { flex: 1; }
 
 .inv-footer {
   margin-top: 6px;

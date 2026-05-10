@@ -2,8 +2,8 @@ import { ORES } from './ores.js';
 import { UPGRADES } from './upgrades.js';
 
 const RARITY_COLORS = [
-  '#c0c4cc', // 0 — light grey (stock)
-  '#6a6e78', // 1 — dark grey
+  '#6a6e78', // 0 — dark grey (stock)
+  '#c0c4cc', // 1 — light grey
   '#3cb371', // 2 — green
   '#4a90d9', // 3 — blue
   '#9966cc', // 4 — purple
@@ -81,7 +81,7 @@ export class Inventory {
         `<div class="inv-row">` +
         `<div class="inv-swatch${sparkle}" style="background:${color}"></div>` +
         `<span class="inv-slot-label">${slotLabel(slot)}</span>` +
-        `<span class="inv-part-name">${equipped?.name ?? '—'}</span>` +
+        `<span class="inv-part-name" style="color:${color}">${equipped?.name ?? '—'}</span>` +
         `</div>`;
     }
     this.drillerList.innerHTML = html;
