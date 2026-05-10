@@ -14,8 +14,8 @@ const FUEL_THRUST_RATE = 4;    // units/sec while thrusting (W)
 const FUEL_HOVER_RATE  = 8;    // units/sec while hovering (space)
 const FUEL_DRILL_RATE = 1.5;   // units/sec while drilling
 const FUEL_IDLE_RATE = 0.05;   // units/sec ambient
-const FALL_DAMAGE_THRESHOLD = 650;
-const FALL_DAMAGE_PER_PXS = 0.12;
+const FALL_DAMAGE_THRESHOLD = 750;
+const FALL_DAMAGE_PER_PXS = 0.24;
 
 const HITBOX_W = 28;
 const HITBOX_H = 28;
@@ -196,7 +196,7 @@ export class Digger {
     const groundedNow = this._moveY(this.vy * dt);
 
     // Fall damage
-    if (groundedNow && !this.onGround && prevVy > FALL_DAMAGE_THRESHOLD) {
+    if (groundedNow && !this.onGround && prevVy > FALL_DAMAGE_THRESHOLD && this.fuel > 0) {
       const excess = prevVy - FALL_DAMAGE_THRESHOLD;
       const dmg = excess * FALL_DAMAGE_PER_PXS;
       this._takeDamage(dmg);

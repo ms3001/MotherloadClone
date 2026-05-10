@@ -90,6 +90,7 @@ export class Game {
       flashMsg: '',
       flashTimer: 0,
       playerNear: false,
+      payoutPopup: null,
     };
     this._initFacilityTiles(this.oreDepot);
 
@@ -135,9 +136,13 @@ export class Game {
       catch { localStorage.removeItem('motherload_save'); }
     }
 
-    this.deathTimer = 0;
-    this.deathDuration = 1.6;
+    this.explosionTimer    = 0;
+    this.explosionDuration = 1.2;
+    this.postExplosionTimer    = 0;
+    this.postExplosionDuration = 3.2;
+    this.explosionPos = null;
     this._konamiProgress = 0;
+    this.introOpen = true;
 
     this.lastTime = performance.now();
     this.accum = 0;
@@ -170,12 +175,24 @@ export class Game {
   }
 
   _update(dt) {
-    if (this.deathTimer > 0) {
-      this.deathTimer -= dt;
-      if (this.deathTimer <= 0) {
-        this.digger.respawn(null);
-        this.camera.snapTo(this.digger.x, this.digger.y);
-        this.hud.hideBanner();
+    if (this.introOpen) {
+      if (this.input.pressed('f')) this.introOpen = false;
+      this.input.endFrame();
+      return;
+    }
+    if (this.explosionTimer > 0) {
+      this.explosionTimer -= dt;
+      if (this.explosionTimer <= 0) {
+        this.postExplosionTimer = this.postExplosionDuration;
+        this.hud.showBanner(this.digger.deathReason ?? 'Wrecked', 'Reloading last save...');
+      }
+      this.input.endFrame();
+      return;
+    }
+    if (this.postExplosionTimer > 0) {
+      this.postExplosionTimer -= dt;
+      if (this.postExplosionTimer <= 0) {
+        this._loadFromSave();
       }
       this.input.endFrame();
       return;
@@ -186,9 +203,9 @@ export class Game {
       : this.input;
     this.digger.update(dt, digInput);
 
-    if (this.digger.dead && this.deathTimer <= 0) {
-      this.deathTimer = this.deathDuration;
-      this.hud.showBanner(this.digger.deathReason ?? 'Wrecked', 'Respawning at surface...');
+    if (this.digger.dead && this.explosionTimer <= 0 && this.postExplosionTimer <= 0) {
+      this.explosionPos = { x: this.digger.x, y: this.digger.y };
+      this.explosionTimer = this.explosionDuration;
     }
 
     this._updateRefuel(dt);
@@ -358,6 +375,17 @@ export class Game {
     this.hud.showBanner('GAME SAVED', 'Progress stored', 3);
   }
 
+  _loadFromSave() {
+    const raw = localStorage.getItem('motherload_save');
+    if (raw) {
+      try { this._load(JSON.parse(raw)); return; } catch {}
+    }
+    this.digger.respawn(null);
+    this.digger.dead = false;
+    this.camera.snapTo(this.digger.x, this.digger.y);
+    this.hud.hideBanner();
+  }
+
   _load(save) {
     this.world = new World(save.seed);
     // Re-apply surface fixtures (not part of seeded generation).
@@ -401,6 +429,7 @@ export class Game {
     const d = this.digger;
     const p = save.player;
     d.x = p.x; d.y = p.y; d.vx = 0; d.vy = 0;
+    d.dead = false; d.deathReason = null;
     d.money = p.money; d.fuel = p.fuel; d.hull = p.hull;
     d.cargo = new Map(Object.entries(p.cargo));
     d.cargoUsed = p.cargoUsed;
@@ -515,22 +544,45 @@ export class Game {
       }
     }
 
-    // Digger
-    const d = this.digger;
-    const facing = d.facing < 0 ? 'left' : 'right';
-    let stateKey = 'idle';
-    if (d.thrusting && d.drilling) stateKey = 'thrustDrill';
-    else if (d.thrusting) stateKey = 'thrust';
-    else if (d.drilling) stateKey = 'drill';
+    // Explosion effect
+    if (this.explosionTimer > 0 && this.explosionPos) {
+      const t  = 1 - this.explosionTimer / this.explosionDuration;
+      const ex = this.explosionPos.x - camX;
+      const ey = this.explosionPos.y - camY;
+      ctx.save();
+      const r3 = t * 90;
+      ctx.beginPath(); ctx.arc(ex, ey, r3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200,80,0,${Math.max(0, 0.6 - t)})`; ctx.fill();
+      const r2 = Math.min(1, t * 2) * 55;
+      ctx.beginPath(); ctx.arc(ex, ey, r2, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,140,0,${Math.max(0, 1 - t * 1.5)})`; ctx.fill();
+      const r1 = Math.min(1, t * 4) * 30 * Math.max(0, 1 - t * 3);
+      if (r1 > 0) {
+        ctx.beginPath(); ctx.arc(ex, ey, r1, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,200,0.9)'; ctx.fill();
+      }
+      ctx.restore();
+    }
 
-    const frames = this.sprites.digger[facing][stateKey];
-    const frameIdx = Math.floor(d.animTime * 12) % frames.length;
-    const sprite = frames[frameIdx];
-    const dx = Math.round(d.x + d.drillNudgeX - TILE_SIZE / 2 - camX);
-    const dy = Math.round(d.y + d.drillNudgeY - TILE_SIZE / 2 + 2 - camY);
-    ctx.drawImage(sprite, dx, dy);
+    // Digger
+    if (this.explosionTimer <= 0) {
+      const d = this.digger;
+      const facing = d.facing < 0 ? 'left' : 'right';
+      let stateKey = 'idle';
+      if (d.thrusting && d.drilling) stateKey = 'thrustDrill';
+      else if (d.thrusting) stateKey = 'thrust';
+      else if (d.drilling) stateKey = 'drill';
+
+      const frames = this.sprites.digger[facing][stateKey];
+      const frameIdx = Math.floor(d.animTime * 12) % frames.length;
+      const sprite = frames[frameIdx];
+      const dx = Math.round(d.x + d.drillNudgeX - TILE_SIZE / 2 - camX);
+      const dy = Math.round(d.y + d.drillNudgeY - TILE_SIZE / 2 + 2 - camY);
+      ctx.drawImage(sprite, dx, dy);
+    }
 
     if (this.upgradeLab.panelOpen) this._renderUpgradePanel();
+    if (this.introOpen) this._renderIntroDialog();
   }
 
   _checkProximity(facility) {
@@ -582,6 +634,10 @@ export class Game {
     depot.playerNear = this._checkProximity(depot);
 
     if (depot.flashTimer > 0) depot.flashTimer -= dt;
+    if (depot.payoutPopup) {
+      depot.payoutPopup.timer -= dt;
+      if (depot.payoutPopup.timer <= 0) depot.payoutPopup = null;
+    }
 
     switch (depot.state) {
       case 'shack': {
@@ -658,7 +714,9 @@ export class Game {
         depot.shipTimer += dt;
         depot.dissolveAlpha = Math.max(0, 1 - depot.shipTimer / 2);
         if (depot.shipTimer >= 2) {
-          d.money = Math.min(d.maxMoney, d.money + depot.pendingValue);
+          const earned = Math.min(d.maxMoney - d.money, depot.pendingValue);
+          d.money += earned;
+          if (earned > 0) depot.payoutPopup = { amount: earned, timer: 2.0 };
           depot.stockpile.clear();
           depot.pendingValue = 0;
           depot.dissolveAlpha = 0;
@@ -738,6 +796,19 @@ export class Game {
     }
 
     if (depot.playerNear) this._renderDepotLabel(ctx, sx, sy);
+
+    if (depot.payoutPopup) {
+      const p = depot.payoutPopup;
+      const elapsed = 2.0 - p.timer;
+      const alpha = Math.max(0, 1 - elapsed / 2.0);
+      const floatY = sy - 16 - elapsed * 30;
+      const cx = sx + depot.w * TILE_SIZE / 2;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      this._setLabelFont(ctx);
+      this._drawLabel(ctx, `+$${Math.round(p.amount)}`, cx, floatY, '#ffd166');
+      ctx.restore();
+    }
   }
 
   _renderDepotLabel(ctx, sx, sy) {
@@ -1221,6 +1292,77 @@ export class Game {
 
     if (sub) { this._drawLabel(ctx, sub, cx, cy, subColor); cy -= 16; }
     this._drawLabel(ctx, label, cx, cy, color);
+  }
+
+  _renderIntroDialog() {
+    const ctx = this.ctx;
+    const cam = this.camera;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.82)';
+    ctx.fillRect(0, 0, cam.viewW, cam.viewH);
+
+    const PW = Math.min(460, cam.viewW - 40);
+    const PH = 300;
+    const px = (cam.viewW - PW) / 2;
+    const py = (cam.viewH - PH) / 2;
+    const PAD = 20;
+    const mx = px + PW / 2;
+
+    ctx.fillStyle = '#080c14';
+    ctx.strokeStyle = '#2a5a8a';
+    ctx.lineWidth = 2;
+    ctx.fillRect(px, py, PW, PH);
+    ctx.strokeRect(px + 1, py + 1, PW - 2, PH - 2);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.font = 'bold 22px ui-monospace, monospace';
+    ctx.fillStyle = '#a0c8ff';
+    ctx.fillText('MOTHERLOAD', mx, py + 28);
+
+    ctx.strokeStyle = '#1a3a5a';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px + PAD, py + 46); ctx.lineTo(px + PW - PAD, py + 46); ctx.stroke();
+
+    const controls = [
+      ['WASD / ARROWS', 'Move & drill'],
+      ['F',             'Interact with facilities'],
+      ['TAB',           'Open inventory'],
+    ];
+    ctx.font = '13px ui-monospace, monospace';
+    let cy = py + 72;
+    for (const [key, desc] of controls) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ffd166';
+      ctx.fillText(key, mx - 8, cy);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#c8d8e8';
+      ctx.fillText(desc, mx + 8, cy);
+      cy += 22;
+    }
+
+    ctx.strokeStyle = '#1a3a5a';
+    ctx.beginPath(); ctx.moveTo(px + PAD, cy + 4); ctx.lineTo(px + PW - PAD, cy + 4); ctx.stroke();
+    cy += 20;
+
+    const tips = [
+      'Mine ores deep underground.',
+      'Sell them at the Ore Depot.',
+      'Upgrade your driller to go deeper.',
+      "Don't run out of fuel!",
+    ];
+    ctx.textAlign = 'center';
+    ctx.font = '12px ui-monospace, monospace';
+    ctx.fillStyle = '#8aa8c8';
+    for (const tip of tips) {
+      ctx.fillText(tip, mx, cy);
+      cy += 19;
+    }
+
+    ctx.font = 'bold 13px ui-monospace, monospace';
+    ctx.fillStyle = '#ffd166';
+    ctx.fillText('[ Press F to start ]', mx, py + PH - 22);
   }
 
   _renderUpgradePanel() {
