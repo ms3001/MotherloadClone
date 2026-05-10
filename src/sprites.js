@@ -388,6 +388,103 @@ function drawOrePad(ctx) {
   rect(ctx, 63, 0,  1, 32, '#1c1e25');
 }
 
+function drawRepairShack(ctx) {
+  // 128×64 canvas, logical 64×32 @ PX=2
+  rect(ctx, 0, 0, 64, 32, '#6b4a2a');
+  for (let lx = 8; lx < 64; lx += 8) rect(ctx, lx, 0, 1, 32, '#3a2010');
+  // Roof, peak at x=22
+  for (let row = 0; row < 10; row++) {
+    const lx = Math.max(0, Math.round(22 - row * 2.4));
+    const rr = Math.min(64, Math.round(22 + row * 2.0));
+    rect(ctx, lx, row, rr - lx, 1, '#4a3010');
+  }
+  rect(ctx, 20, 0, 4, 1, '#7a5830');
+  rect(ctx, 0, 10, 64, 2, '#3a2010');
+  // Broken window
+  rect(ctx, 8, 14, 10, 8, '#1a2233');
+  rect(ctx, 8, 14, 1, 8, '#3a2010');
+  rect(ctx, 8, 14, 10, 1, '#3a2010');
+  rect(ctx, 12, 14, 1, 4, '#2a1a10');
+  // Door
+  rect(ctx, 46, 16, 12, 16, '#1a0f08');
+  rect(ctx, 46, 14, 12, 2, '#3a2010');
+  rect(ctx, 46, 14, 2, 18, '#3a2010');
+  rect(ctx, 56, 14, 2, 18, '#3a2010');
+  // Weathering
+  rect(ctx,  3, 18, 2, 1, '#2a1a0a');
+  rect(ctx, 28, 22, 3, 1, '#2a1a0a');
+  rect(ctx, 38, 17, 1, 2, '#2a1a0a');
+}
+
+function drawRepairGarage(ctx) {
+  // 128×64 canvas, logical 64×32 @ PX=2 — cyberpunk/martian repair bay
+  rect(ctx, 0, 0, 64, 32, '#0e1118');
+
+  // Left pillar
+  rect(ctx, 0, 0, 6, 32, '#3a4055');
+  rect(ctx, 0, 0, 1, 32, '#7a8590');
+  rect(ctx, 5, 0, 1, 32, '#1a1e2a');
+  rect(ctx, 1, 8,  4, 1,  '#1a1e2a');
+  rect(ctx, 1, 18, 4, 1,  '#1a1e2a');
+  px(ctx, 2, 2,  '#7a8a9a'); px(ctx, 4, 2,  '#7a8a9a');
+  px(ctx, 2, 28, '#7a8a9a'); px(ctx, 4, 28, '#7a8a9a');
+  rect(ctx, 3, 4,  1, 3, '#007a8c'); // cyan accent stripes
+  rect(ctx, 3, 13, 1, 4, '#007a8c');
+  rect(ctx, 3, 21, 1, 4, '#007a8c');
+
+  // Right pillar
+  rect(ctx, 58, 0, 6, 32, '#3a4055');
+  rect(ctx, 58, 0, 1, 32, '#7a8590');
+  rect(ctx, 63, 0, 1, 32, '#1a1e2a');
+  rect(ctx, 58, 8,  5, 1,  '#1a1e2a');
+  rect(ctx, 58, 18, 5, 1,  '#1a1e2a');
+  px(ctx, 59, 2,  '#7a8a9a'); px(ctx, 61, 2,  '#7a8a9a');
+  px(ctx, 59, 28, '#7a8a9a'); px(ctx, 61, 28, '#7a8a9a');
+  rect(ctx, 60, 4,  1, 3, '#007a8c');
+  rect(ctx, 60, 13, 1, 4, '#007a8c');
+  rect(ctx, 60, 21, 1, 4, '#007a8c');
+  // Control panel
+  rect(ctx, 58, 10, 5, 6, '#0a0d14');
+  px(ctx, 59, 12, '#00dd88'); // green LED
+  px(ctx, 61, 12, '#ff4422'); // orange LED
+  rect(ctx, 59, 14, 3, 1, '#3a4050'); // button
+
+  // Overhead beam
+  rect(ctx, 6, 0, 52, 3, '#252a38');
+  rect(ctx, 6, 0, 52, 1, '#5a6375');
+  rect(ctx, 8, 2, 48, 1, '#3a4050'); // track rail
+
+  // Bay interior
+  rect(ctx, 6, 3, 52, 24, '#0a0d14');
+  rect(ctx, 8,  3, 48, 1, '#004a58'); // ceiling glow (teal)
+  rect(ctx, 12, 3, 40, 1, '#006070');
+  rect(ctx, 8, 10, 48, 1, '#141720'); // wall lines
+  rect(ctx, 8, 18, 48, 1, '#141720');
+
+  // Hook 1 — J-shape at x=20
+  rect(ctx, 20, 3, 1, 9, '#4a5060');
+  rect(ctx, 20, 3, 1, 1, '#6a7080');
+  rect(ctx, 20, 12, 4, 1, '#4a5060');
+  rect(ctx, 23, 12, 1, 3, '#4a5060');
+  rect(ctx, 20, 14, 3, 1, '#3a4050');
+
+  // Hook 2 — J-shape at x=40
+  rect(ctx, 40, 3, 1, 8, '#4a5060');
+  rect(ctx, 40, 3, 1, 1, '#6a7080');
+  rect(ctx, 40, 11, 4, 1, '#4a5060');
+  rect(ctx, 43, 11, 1, 3, '#4a5060');
+  rect(ctx, 40, 13, 3, 1, '#3a4050');
+
+  // Repair floor platform
+  rect(ctx, 6,  27, 52, 1, '#003a48');
+  rect(ctx, 8,  28, 48, 1, '#005a6c'); // teal glow
+  rect(ctx, 6,  29, 52, 3, '#1a2230'); // floor plate
+  for (let lx = 10; lx < 57; lx += 7) rect(ctx, lx, 29, 1, 3, '#222a38');
+
+  // Top edge highlight
+  rect(ctx, 0, 0, 64, 1, '#8090a0');
+}
+
 export function buildSprites() {
   const sprites = {
     tiles: {},
@@ -397,6 +494,8 @@ export function buildSprites() {
     oreShack: null,
     oreStorage: null,
     orePad: null,
+    repairShack: null,
+    repairGarage: null,
   };
 
   // Tile sprites
@@ -466,6 +565,22 @@ export function buildSprites() {
   padCtx.imageSmoothingEnabled = false;
   drawOrePad(padCtx);
   sprites.orePad = padC;
+
+  // Repair shack (128×64, 64×32 logical @ PX=2)
+  const repairShackC = document.createElement('canvas');
+  repairShackC.width = 128; repairShackC.height = 64;
+  const repairShackCtx = repairShackC.getContext('2d');
+  repairShackCtx.imageSmoothingEnabled = false;
+  drawRepairShack(repairShackCtx);
+  sprites.repairShack = repairShackC;
+
+  // Repair garage (128×64, 64×32 logical @ PX=2)
+  const repairGarageC = document.createElement('canvas');
+  repairGarageC.width = 128; repairGarageC.height = 64;
+  const repairGarageCtx = repairGarageC.getContext('2d');
+  repairGarageCtx.imageSmoothingEnabled = false;
+  drawRepairGarage(repairGarageCtx);
+  sprites.repairGarage = repairGarageC;
 
   // Digger variants — index by [facing][stateKey][frame]
   const DIGGER_STATES = [

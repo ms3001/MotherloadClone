@@ -18,6 +18,12 @@ const DEPOT_BUILD_DURATION  = 10;
 const COPPER_BUILD_COST     = 10;
 const SHIP_OFFSCREEN_Y      = 0; // world-y at sky top, always above viewport
 
+const REPAIR_TRIGGER_PADDING = 12;
+const REPAIR_RATE            = 20;  // HP/sec while holding F
+const REPAIR_PRICE_PER_HP    = 5;   // credits per HP
+const REPAIR_COPPER_COST     = 20;
+const REPAIR_CREDIT_COST     = 100;
+
 const ORE_BY_KEY = new Map(ORES.map(o => [o.key, o]));
 
 function _easeInQuad(t)  { return t * t; }
@@ -76,6 +82,19 @@ export class Game {
       playerNear: false,
     };
     this._initDepotTiles();
+
+    // Repair shop: 4 tiles wide, 3 tiles right of ore depot's right edge
+    this.repairShop = {
+      tx: spawnTx + 22, ty: SURFACE_ROW - 2, w: 4, h: 2,
+      state: 'shack',
+      buildTimer: 0,
+      flashMsg: '',
+      flashTimer: 0,
+      playerNear: false,
+      repairBought: 0,
+      repairBoughtTimer: 0,
+    };
+    this._initRepairShopTiles();
 
     // Spawn marker: one concrete block at the surface under spawn
     this.world.set(spawnTx, SURFACE_ROW, TILE.CONCRETE);
@@ -147,6 +166,7 @@ export class Game {
 
     this._updateRefuel(dt);
     this._updateOreDepot(dt);
+    this._updateRepairShop(dt);
 
     const flagCx = this.spawnFlagX + TILE_SIZE / 2;
     const flagCy = this.spawnFlagY - this.sprites.spawnFlag.height;
@@ -253,6 +273,9 @@ export class Game {
       stockpile: Object.fromEntries(depot.stockpile),
     };
 
+    const shop = this.repairShop;
+    const shopSave = { state: shop.state, buildTimer: shop.buildTimer };
+
     const save = {
       v: 1,
       seed: this.world.seed,
@@ -266,6 +289,7 @@ export class Game {
         attachments,
       },
       depot: depotSave,
+      repairShop: shopSave,
       diff,
     };
     localStorage.setItem('motherload_save', JSON.stringify(save));
@@ -282,6 +306,7 @@ export class Game {
       }
     }
     this._initDepotTiles();
+    this._initRepairShopTiles();
     this.world.set(spawnTx, SURFACE_ROW, TILE.CONCRETE);
     // Apply player-made changes.
     for (const [i, v] of save.diff) this.world.tiles[i] = v;
@@ -297,6 +322,11 @@ export class Game {
           if (v > 0) this.oreDepot.stockpile.set(k, v);
         }
       }
+    }
+
+    if (save.repairShop) {
+      this.repairShop.state = save.repairShop.state ?? 'shack';
+      this.repairShop.buildTimer = save.repairShop.buildTimer ?? 0;
     }
 
     this.digger.world = this.world;
@@ -409,6 +439,7 @@ export class Game {
     }
 
     this._renderOreDepot();
+    this._renderRepairShop();
 
     // Spawn flag (drawn above the concrete spawn block)
     const flagSprite = this.sprites.spawnFlag;
@@ -612,8 +643,8 @@ export class Game {
     if (depot.state === 'shack' || depot.state === 'constructing') {
       ctx.drawImage(this.sprites.oreShack, sx, sy);
       if (depot.state === 'constructing') {
-        this._renderConstructionShips(ctx, cam, sx, sy, depot.buildTimer);
-        this._renderProgressBar(ctx, sx, sy, depot.buildTimer / DEPOT_BUILD_DURATION);
+        this._renderConstructionShips(ctx, cam, sx, sy, depot.buildTimer, depot.w);
+        this._renderProgressBar(ctx, sx, sy, spw, depot.buildTimer / DEPOT_BUILD_DURATION);
       }
     } else {
       ctx.drawImage(this.sprites.oreStorage, sx, sy);
@@ -670,11 +701,10 @@ export class Game {
     ctx.fillText(label, cx, cy);
   }
 
-  _renderProgressBar(ctx, sx, sy, progress) {
-    const depot = this.oreDepot;
+  _renderProgressBar(ctx, sx, sy, facilityPxW, progress) {
     const BAR_W = 120;
     const BAR_H = 6;
-    const bx = sx + (depot.w * TILE_SIZE - BAR_W) / 2;
+    const bx = sx + (facilityPxW - BAR_W) / 2;
     const by = sy - 22;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
@@ -803,9 +833,9 @@ export class Game {
     ctx.restore();
   }
 
-  _renderConstructionShips(ctx, cam, sx, sy, buildTimer) {
+  _renderConstructionShips(ctx, cam, sx, sy, buildTimer, facilityW) {
     const t = buildTimer;
-    const shackCenterSX = sx + this.oreDepot.w * TILE_SIZE / 2;
+    const shackCenterSX = sx + facilityW * TILE_SIZE / 2;
     const aboveSY = sy - cam.viewH;
 
     if (t < 8) {
@@ -851,6 +881,171 @@ export class Game {
     ctx.stroke();
 
     ctx.restore();
+  }
+
+  _initRepairShopTiles() {
+    const shop = this.repairShop;
+    for (let dx = -1; dx < shop.w + 1; dx++) {
+      this.world.set(shop.tx + dx, shop.ty + shop.h, TILE.CONCRETE);
+    }
+    for (let dy = 0; dy < shop.h; dy++) {
+      for (let dx = 0; dx < shop.w; dx++) {
+        this.world.set(shop.tx + dx, shop.ty + dy, TILE.SKY);
+      }
+    }
+  }
+
+  _updateRepairShop(dt) {
+    const shop = this.repairShop;
+    const d = this.digger;
+    if (d.dead) return;
+
+    const b = d.bbox;
+    const rx = shop.tx * TILE_SIZE - REPAIR_TRIGGER_PADDING;
+    const ry = shop.ty * TILE_SIZE - REPAIR_TRIGGER_PADDING;
+    const rw = shop.w  * TILE_SIZE + REPAIR_TRIGGER_PADDING * 2;
+    const rh = shop.h  * TILE_SIZE + REPAIR_TRIGGER_PADDING * 2;
+    shop.playerNear = b.x < rx + rw && b.x + b.w > rx && b.y < ry + rh && b.y + b.h > ry;
+
+    if (shop.flashTimer > 0) shop.flashTimer -= dt;
+
+    switch (shop.state) {
+      case 'shack': {
+        if (shop.playerNear && this.input.pressed('f')) {
+          const copper = d.cargo.get('copper') ?? 0;
+          if (copper >= REPAIR_COPPER_COST && d.money >= REPAIR_CREDIT_COST) {
+            const newCount = copper - REPAIR_COPPER_COST;
+            if (newCount === 0) d.cargo.delete('copper');
+            else d.cargo.set('copper', newCount);
+            d.cargoUsed = Math.max(0, d.cargoUsed - REPAIR_COPPER_COST);
+            d.money = Math.max(0, d.money - REPAIR_CREDIT_COST);
+            shop.state = 'constructing';
+            shop.buildTimer = 0;
+          } else {
+            if (copper < REPAIR_COPPER_COST && d.money < REPAIR_CREDIT_COST)
+              shop.flashMsg = `NEED ${REPAIR_COPPER_COST} COPPER + $${REPAIR_CREDIT_COST}`;
+            else if (copper < REPAIR_COPPER_COST)
+              shop.flashMsg = `NEED ${REPAIR_COPPER_COST} COPPER`;
+            else
+              shop.flashMsg = `NEED $${REPAIR_CREDIT_COST}`;
+            shop.flashTimer = 2;
+          }
+        }
+        break;
+      }
+
+      case 'constructing': {
+        shop.buildTimer += dt;
+        if (shop.buildTimer >= DEPOT_BUILD_DURATION) {
+          shop.buildTimer = DEPOT_BUILD_DURATION;
+          shop.state = 'garage';
+        }
+        break;
+      }
+
+      case 'garage': {
+        if (!this.input.down('f') || !shop.playerNear) {
+          if (shop.repairBoughtTimer > 0) {
+            shop.repairBoughtTimer -= dt;
+            if (shop.repairBoughtTimer <= 0) shop.repairBought = 0;
+          }
+          break;
+        }
+        if (d.hull >= d.maxHull || d.money <= 0) break;
+        const maxWant = REPAIR_RATE * dt;
+        const affordable = d.money / REPAIR_PRICE_PER_HP;
+        const needed = d.maxHull - d.hull;
+        const want = Math.min(maxWant, affordable, needed);
+        d.hull = Math.min(d.maxHull, d.hull + want);
+        d.money = Math.max(0, d.money - want * REPAIR_PRICE_PER_HP);
+        shop.repairBought += want;
+        shop.repairBoughtTimer = 3;
+        break;
+      }
+    }
+  }
+
+  _renderRepairShop() {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const shop = this.repairShop;
+    const camX = Math.round(cam.x);
+    const camY = Math.round(cam.y);
+
+    const sx = shop.tx * TILE_SIZE - camX;
+    const sy = shop.ty * TILE_SIZE - camY;
+    const spw = shop.w * TILE_SIZE;
+    const sph = shop.h * TILE_SIZE;
+
+    if (sx + spw < 0 || sx > cam.viewW || sy + sph < 0 || sy > cam.viewH) return;
+
+    if (shop.state === 'shack' || shop.state === 'constructing') {
+      ctx.drawImage(this.sprites.repairShack, sx, sy);
+      if (shop.state === 'constructing') {
+        this._renderConstructionShips(ctx, cam, sx, sy, shop.buildTimer, shop.w);
+        this._renderProgressBar(ctx, sx, sy, spw, shop.buildTimer / DEPOT_BUILD_DURATION);
+      }
+    } else {
+      ctx.drawImage(this.sprites.repairGarage, sx, sy);
+    }
+
+    if (shop.playerNear) this._renderRepairShopLabel(ctx, sx, sy);
+  }
+
+  _renderRepairShopLabel(ctx, sx, sy) {
+    const shop = this.repairShop;
+    const d = this.digger;
+    const cx = sx + shop.w * TILE_SIZE / 2;
+    let cy = sy - 6;
+
+    ctx.font = 'bold 12px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+
+    let label, color, sub, subColor;
+
+    if (shop.state === 'shack') {
+      if (shop.flashTimer > 0) {
+        label = shop.flashMsg;
+        color = '#e63946';
+      } else {
+        label = '[F] BUILD REPAIR SHOP';
+        color = '#ffd166';
+        sub = `${REPAIR_COPPER_COST} copper  +  $${REPAIR_CREDIT_COST}`;
+        subColor = '#c8a030';
+      }
+    } else if (shop.state === 'constructing') {
+      label = 'CONSTRUCTING...';
+      color = '#a8e6a0';
+    } else {
+      if (d.hull >= d.maxHull) {
+        label = 'HULL INTACT';
+        color = '#9bdcff';
+      } else {
+        const repairing = this.input.down('f') && d.money > 0;
+        label = repairing ? 'REPAIRING...' : `[F] REPAIR HULL  $${REPAIR_PRICE_PER_HP}/HP`;
+        color = repairing ? '#a8e6a0' : '#ffd166';
+        if (shop.repairBought > 0) {
+          sub = `+${Math.floor(shop.repairBought)} HP repaired`;
+          subColor = '#a8e6a0';
+        }
+      }
+    }
+
+    if (!label) return;
+
+    if (sub) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillText(sub, cx + 1, cy + 1);
+      ctx.fillStyle = subColor;
+      ctx.fillText(sub, cx, cy);
+      cy -= 16;
+    }
+
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillText(label, cx + 1, cy + 1);
+    ctx.fillStyle = color;
+    ctx.fillText(label, cx, cy);
   }
 }
 
