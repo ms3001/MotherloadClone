@@ -161,13 +161,20 @@ export class Digger {
     }
 
     // ---- Drill nudge (visual only) ----
+    // Default: hold current nudge. Only commit to a target when actively
+    // progressing a tile, and only return to 0 when not drilling at all.
+    // This prevents the sprite from dipping between consecutive tiles.
     const MAX_NUDGE = 5;
-    let targetNudgeX = 0, targetNudgeY = 0;
+    let targetNudgeX = this.drillNudgeX;
+    let targetNudgeY = this.drillNudgeY;
     if (this.drillTarget && this.drillProgress > 0) {
       const d = this.drillTarget.dir;
       if (d === 'down')  targetNudgeY =  MAX_NUDGE;
       else if (d === 'right') targetNudgeX =  MAX_NUDGE;
       else if (d === 'left')  targetNudgeX = -MAX_NUDGE;
+    } else if (!this.drilling) {
+      targetNudgeX = 0;
+      targetNudgeY = 0;
     }
     const nudgeSpeed = targetNudgeX !== 0 || targetNudgeY !== 0 ? 40 : 20;
     this.drillNudgeX += (targetNudgeX - this.drillNudgeX) * Math.min(1, nudgeSpeed * dt);
