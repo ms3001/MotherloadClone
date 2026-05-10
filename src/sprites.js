@@ -1,5 +1,6 @@
 import { TILE, ORES, ORE_OFFSET, isOre } from './ores.js';
 import { TILE_SIZE } from './world.js';
+import { mulberry32 } from './rng.js';
 
 // Each sprite is a 32x32 offscreen canvas, drawn pixel-by-pixel via fillRect.
 // We work on an internal 16x16 grid scaled 2x for chunky pixel-art look.
@@ -24,11 +25,7 @@ function rect(ctx, x, y, w, h, color) {
 }
 
 function noisyFill(ctx, baseColor, dark, light, seed) {
-  let s = seed >>> 0;
-  const r = () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 4294967296;
-  };
+  const r = mulberry32(seed);
   rect(ctx, 0, 0, 16, 16, baseColor);
   for (let y = 0; y < 16; y++) {
     for (let x = 0; x < 16; x++) {
@@ -68,6 +65,31 @@ function drawBedrock(ctx) {
     px(ctx, i, i, '#0a0b0f');
     px(ctx, (i + 8) % 16, i, '#0a0b0f');
   }
+}
+
+function drawSpawnFlag(ctx) {
+  // 16x48 logical px (32x96 canvas at PX=2): pole runs full height, flag at top.
+  // Pole
+  rect(ctx, 7, 0, 2, 48, '#b0b4be');
+  rect(ctx, 7, 0, 1, 48, '#d8dce4'); // highlight
+  // Ball on top
+  rect(ctx, 6, 0, 4, 2, '#ffd166');
+  rect(ctx, 5, 1, 6, 2, '#ffd166');
+  rect(ctx, 6, 3, 4, 1, '#c8a030');
+  // Flag (triangle pointing right)
+  for (let row = 0; row < 8; row++) {
+    const w = 8 - row;
+    rect(ctx, 9, 5 + row, w, 1, row < 4 ? '#e63946' : '#c1121f');
+  }
+}
+
+function drawConcrete(ctx) {
+  noisyFill(ctx, '#5a5e66', '#3e4249', '#7e848f', 8888);
+  // horizontal groove lines
+  rect(ctx, 0, 5, 16, 1, '#3e4249');
+  rect(ctx, 0, 11, 16, 1, '#3e4249');
+  // top highlight edge
+  rect(ctx, 0, 0, 16, 1, '#7e848f');
 }
 
 function drawSky(ctx) {
@@ -274,6 +296,7 @@ export function buildSprites() {
     tiles: {},
     digger: {},
     gasPump: null,
+    spawnFlag: null,
   };
 
   // Tile sprites
@@ -297,12 +320,22 @@ export function buildSprites() {
   drawBedrock(bedC.getContext('2d'));
   sprites.tiles[TILE.BEDROCK] = bedC;
 
+  const concreteC = makeCanvas(TILE_SIZE);
+  drawConcrete(concreteC.getContext('2d'));
+  sprites.tiles[TILE.CONCRETE] = concreteC;
+
   // Ore tiles
   for (const ore of ORES) {
     const c = makeCanvas(TILE_SIZE);
     drawOreTile(c.getContext('2d'), ore);
     sprites.tiles[ore.id] = c;
   }
+
+  // Spawn flag (32x96, 16x48 logical px @ PX=2)
+  const flagC = makeCanvas(TILE_SIZE);
+  flagC.height = TILE_SIZE * 3;
+  drawSpawnFlag(flagC.getContext('2d'));
+  sprites.spawnFlag = flagC;
 
   // Gas pump (64x64, 32 logical px @ PX=2)
   const pumpC = makeCanvas(64);
@@ -311,45 +344,22 @@ export function buildSprites() {
   drawGasPump(pumpCtx);
   sprites.gasPump = pumpC;
 
-  // Digger variants — index by [facing][thrust][drill][frame]
-  sprites.digger = {
-    right: {
-      idle: [
-        composeDigger({ thrusting: false, drilling: false, frame: 0, facingLeft: false }),
-        composeDigger({ thrusting: false, drilling: false, frame: 1, facingLeft: false }),
-      ],
-      thrust: [
-        composeDigger({ thrusting: true, drilling: false, frame: 0, facingLeft: false }),
-        composeDigger({ thrusting: true, drilling: false, frame: 1, facingLeft: false }),
-      ],
-      drill: [
-        composeDigger({ thrusting: false, drilling: true, frame: 0, facingLeft: false }),
-        composeDigger({ thrusting: false, drilling: true, frame: 1, facingLeft: false }),
-      ],
-      thrustDrill: [
-        composeDigger({ thrusting: true, drilling: true, frame: 0, facingLeft: false }),
-        composeDigger({ thrusting: true, drilling: true, frame: 1, facingLeft: false }),
-      ],
-    },
-    left: {
-      idle: [
-        composeDigger({ thrusting: false, drilling: false, frame: 0, facingLeft: true }),
-        composeDigger({ thrusting: false, drilling: false, frame: 1, facingLeft: true }),
-      ],
-      thrust: [
-        composeDigger({ thrusting: true, drilling: false, frame: 0, facingLeft: true }),
-        composeDigger({ thrusting: true, drilling: false, frame: 1, facingLeft: true }),
-      ],
-      drill: [
-        composeDigger({ thrusting: false, drilling: true, frame: 0, facingLeft: true }),
-        composeDigger({ thrusting: false, drilling: true, frame: 1, facingLeft: true }),
-      ],
-      thrustDrill: [
-        composeDigger({ thrusting: true, drilling: true, frame: 0, facingLeft: true }),
-        composeDigger({ thrusting: true, drilling: true, frame: 1, facingLeft: true }),
-      ],
-    },
-  };
+  // Digger variants — index by [facing][stateKey][frame]
+  const DIGGER_STATES = [
+    { key: 'idle',       thrusting: false, drilling: false },
+    { key: 'thrust',     thrusting: true,  drilling: false },
+    { key: 'drill',      thrusting: false, drilling: true  },
+    { key: 'thrustDrill',thrusting: true,  drilling: true  },
+  ];
+  sprites.digger = {};
+  for (const facing of ['right', 'left']) {
+    sprites.digger[facing] = {};
+    for (const { key, thrusting, drilling } of DIGGER_STATES) {
+      sprites.digger[facing][key] = [0, 1].map(frame =>
+        composeDigger({ thrusting, drilling, frame, facingLeft: facing === 'left' })
+      );
+    }
+  }
 
   return sprites;
 }

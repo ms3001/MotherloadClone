@@ -301,7 +301,7 @@ export class Digger {
       for (const cx of candidates) {
         if (!w.inBounds(cx, ty)) continue;
         const t = w.get(cx, ty);
-        if (isDrillable(t) && !w.isProtected(cx, ty) && tileDrillTier(t) <= this.drillTier) {
+        if (isDrillable(t) && tileDrillTier(t) <= this.drillTier) {
           tx = cx;
           break;
         }
@@ -330,7 +330,6 @@ export class Digger {
     if (!w.inBounds(tx, ty)) return null;
     const tile = w.get(tx, ty);
     if (!isDrillable(tile)) return null;
-    if (w.isProtected(tx, ty)) return null;
     if (tileDrillTier(tile) > this.drillTier) return null;
     return { tx, ty };
   }
@@ -379,16 +378,19 @@ export class Digger {
 
   // -- Collision (axis-separated AABB vs grid) --
 
+  // Returns [minTile, maxTile] for a pixel span [lo, hi) along one axis.
+  _tileRange(lo, hi) {
+    return [Math.floor(lo / TILE_SIZE), Math.floor((hi - 0.001) / TILE_SIZE)];
+  }
+
   _moveX(dx) {
     if (dx === 0) return;
     const b = this.bbox;
     let newX = b.x + dx;
+    const [minTy, maxTy] = this._tileRange(b.y, b.y + b.h);
 
     if (dx > 0) {
-      const aheadX = newX + b.w;
-      const tileX = Math.floor(aheadX / TILE_SIZE);
-      const minTy = Math.floor(b.y / TILE_SIZE);
-      const maxTy = Math.floor((b.y + b.h - 0.001) / TILE_SIZE);
+      const tileX = Math.floor((newX + b.w) / TILE_SIZE);
       for (let ty = minTy; ty <= maxTy; ty++) {
         if (isSolid(this.world.get(tileX, ty))) {
           newX = tileX * TILE_SIZE - b.w - 0.001;
@@ -397,10 +399,7 @@ export class Digger {
         }
       }
     } else {
-      const aheadX = newX;
-      const tileX = Math.floor(aheadX / TILE_SIZE);
-      const minTy = Math.floor(b.y / TILE_SIZE);
-      const maxTy = Math.floor((b.y + b.h - 0.001) / TILE_SIZE);
+      const tileX = Math.floor(newX / TILE_SIZE);
       for (let ty = minTy; ty <= maxTy; ty++) {
         if (isSolid(this.world.get(tileX, ty))) {
           newX = (tileX + 1) * TILE_SIZE + 0.001;
@@ -418,12 +417,10 @@ export class Digger {
     const b = this.bbox;
     let newY = b.y + dy;
     let grounded = false;
+    const [minTx, maxTx] = this._tileRange(b.x, b.x + b.w);
 
     if (dy > 0) {
-      const aheadY = newY + b.h;
-      const tileY = Math.floor(aheadY / TILE_SIZE);
-      const minTx = Math.floor(b.x / TILE_SIZE);
-      const maxTx = Math.floor((b.x + b.w - 0.001) / TILE_SIZE);
+      const tileY = Math.floor((newY + b.h) / TILE_SIZE);
       for (let tx = minTx; tx <= maxTx; tx++) {
         if (isSolid(this.world.get(tx, tileY))) {
           newY = tileY * TILE_SIZE - b.h - 0.001;
@@ -433,10 +430,7 @@ export class Digger {
         }
       }
     } else if (dy < 0) {
-      const aheadY = newY;
-      const tileY = Math.floor(aheadY / TILE_SIZE);
-      const minTx = Math.floor(b.x / TILE_SIZE);
-      const maxTx = Math.floor((b.x + b.w - 0.001) / TILE_SIZE);
+      const tileY = Math.floor(newY / TILE_SIZE);
       for (let tx = minTx; tx <= maxTx; tx++) {
         if (isSolid(this.world.get(tx, tileY))) {
           newY = (tileY + 1) * TILE_SIZE + 0.001;
@@ -452,9 +446,8 @@ export class Digger {
     if (!grounded) {
       const below = this.y + b.h / 2 + 1;
       const tileY = Math.floor(below / TILE_SIZE);
-      const minTx = Math.floor((this.x - b.w / 2) / TILE_SIZE);
-      const maxTx = Math.floor((this.x + b.w / 2 - 0.001) / TILE_SIZE);
-      for (let tx = minTx; tx <= maxTx; tx++) {
+      const [minTx2, maxTx2] = this._tileRange(this.x - b.w / 2, this.x + b.w / 2);
+      for (let tx = minTx2; tx <= maxTx2; tx++) {
         if (isSolid(this.world.get(tx, tileY))) {
           grounded = true;
           break;

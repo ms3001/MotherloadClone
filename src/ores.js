@@ -5,6 +5,7 @@ export const TILE = {
   STONE: 2,
   HARDSTONE: 3,
   BEDROCK: 4,
+  CONCRETE: 5,
 };
 
 export const ORE_OFFSET = 16;
@@ -59,5 +60,5 @@ export function isSolid(tileId) {
 }
 
 export function isDrillable(tileId) {
-  return tileId !== TILE.SKY && tileId !== TILE.BEDROCK;
+  return tileId !== TILE.SKY && tileId !== TILE.BEDROCK && tileId !== TILE.CONCRETE;
 }

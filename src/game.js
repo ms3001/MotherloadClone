@@ -5,7 +5,7 @@ import { Input } from './input.js';
 import { HUD } from './hud.js';
 import { buildSprites, tileSprite } from './sprites.js';
 import { TILE, isOre } from './ores.js';
-import { hashStringToSeed } from './rng.js';
+import { hashStringToSeed, mulberry32 } from './rng.js';
 import { gasPriceFor, GAS_PRICE_PER_UNIT } from './upgrades.js';
 
 // How fast the pump dispenses fuel (units per second) while holding F.
@@ -41,12 +41,17 @@ export class Game {
     this.fuelBought = 0;
     this.fuelBoughtTimer = 0;
 
-    // Protect tiles beneath each gas station + the 1-tile footer overhang on each side
+    // Concrete tiles beneath each gas station + 1-tile overhang on each side
     for (const gs of this.gasStations) {
       for (let dx = -1; dx < gs.w + 1; dx++) {
-        this.world.protect(gs.tx + dx, gs.ty + gs.h);
+        this.world.set(gs.tx + dx, gs.ty + gs.h, TILE.CONCRETE);
       }
     }
+
+    // Spawn marker: one concrete block at the surface under spawn
+    this.world.set(spawnTx, SURFACE_ROW, TILE.CONCRETE);
+    this.spawnFlagX = spawnTx * TILE_SIZE;
+    this.spawnFlagY = SURFACE_ROW * TILE_SIZE;
 
     this.clouds = this._buildClouds(seed);
 
@@ -113,9 +118,7 @@ export class Game {
   _buildClouds(seed) {
     const clouds = [];
     const worldPxW = WORLD_W * TILE_SIZE;
-    // Simple deterministic RNG
-    let s = (seed ^ 0xc0ffee) >>> 0;
-    const rng = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 0x100000000; };
+    const rng = mulberry32(seed ^ 0xc0ffee);
 
     for (let i = 0; i < 28; i++) {
       const cx = rng() * worldPxW;
@@ -258,18 +261,6 @@ export class Game {
       // Cull off-screen stations
       if (sx + r.w < 0 || sy + r.h < 0 || sx > cam.viewW || sy > cam.viewH) continue;
 
-      // Concrete footer (1 tile wider on each side)
-      const fy = sy + r.h;
-      const fh = 10;
-      const fx = sx - TILE_SIZE;
-      const fw = r.w + TILE_SIZE * 2;
-      ctx.fillStyle = '#5a5e66';
-      ctx.fillRect(fx, fy, fw, fh);
-      ctx.fillStyle = '#7e848f';
-      ctx.fillRect(fx, fy, fw, 2);
-      ctx.fillStyle = '#3e4249';
-      ctx.fillRect(fx, fy + fh - 2, fw, 2);
-
       ctx.drawImage(this.sprites.gasPump, sx, sy);
 
       if (this.refuelingStation === gs) {
@@ -293,6 +284,14 @@ export class Game {
         ctx.fillStyle = '#ffd166';
         ctx.fillText(label, cx, cy);
       }
+    }
+
+    // Spawn flag (drawn above the concrete spawn block)
+    const flagSprite = this.sprites.spawnFlag;
+    const flagSx = this.spawnFlagX - camX;
+    const flagSy = this.spawnFlagY - flagSprite.height - camY;
+    if (flagSx + flagSprite.width >= 0 && flagSx <= cam.viewW) {
+      ctx.drawImage(flagSprite, flagSx, flagSy);
     }
 
     // Digger

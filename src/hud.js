@@ -11,15 +11,17 @@ export class HUD {
     this.banner = document.getElementById('banner');
   }
 
+  _updateBar(fill, val, current, max) {
+    fill.style.width = `${(current / max) * 100}%`;
+    val.textContent = `${Math.round(current)} / ${max}`;
+  }
+
   update(digger, world) {
     const depthM = world.depthMeters(digger.y);
     this.depth.textContent = depthM > 0 ? `-${depthM} m` : `${-depthM} m`;
-    this.fuel.style.width = `${(digger.fuel / digger.maxFuel) * 100}%`;
-    this.fuelVal.textContent = `${Math.round(digger.fuel)} / ${digger.maxFuel}`;
-    this.hull.style.width = `${(digger.hull / digger.maxHull) * 100}%`;
-    this.hullVal.textContent = `${Math.round(digger.hull)} / ${digger.maxHull}`;
-    this.cargo.style.width = `${(digger.cargoUsed / digger.maxCargo) * 100}%`;
-    this.cargoVal.textContent = `${digger.cargoUsed} / ${digger.maxCargo}`;
+    this._updateBar(this.fuel, this.fuelVal, digger.fuel, digger.maxFuel);
+    this._updateBar(this.hull, this.hullVal, digger.hull, digger.maxHull);
+    this._updateBar(this.cargo, this.cargoVal, digger.cargoUsed, digger.maxCargo);
     this.money.textContent = `$${digger.money.toFixed(2)}`;
   }
 

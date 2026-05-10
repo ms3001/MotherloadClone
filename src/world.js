@@ -14,7 +14,6 @@ export class World {
     this.tiles = new Uint8Array(this.w * this.h);
     // per-tile drill progress, only allocated lazily
     this.progress = new Map();
-    this.protected = new Set();
     this._generate();
   }
 
@@ -46,14 +45,6 @@ export class World {
 
   clearProgress(tx, ty) {
     this.progress.delete(this.idx(tx, ty));
-  }
-
-  protect(tx, ty) {
-    if (this.inBounds(tx, ty)) this.protected.add(this.idx(tx, ty));
-  }
-
-  isProtected(tx, ty) {
-    return this.protected.has(this.idx(tx, ty));
   }
 
   _generate() {
@@ -149,6 +140,7 @@ export function tileLabel(id) {
     case TILE.STONE: return 'Stone';
     case TILE.HARDSTONE: return 'Hard Stone';
     case TILE.BEDROCK: return 'Bedrock';
+    case TILE.CONCRETE: return 'Concrete';
     default: return '?';
   }
 }
