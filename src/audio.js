@@ -72,6 +72,29 @@ export class AudioManager {
         osc.connect(gain); gain.connect(ctx.destination);
         osc.start(t); osc.stop(t + 0.18);
       },
+      click: (ctx, t) => {
+        // Mechanical chunk: short square burst, low-mid
+        const o1 = ctx.createOscillator();
+        const g1 = ctx.createGain();
+        o1.type = 'square';
+        o1.frequency.setValueAtTime(320, t);
+        o1.frequency.exponentialRampToValueAtTime(160, t + 0.03);
+        g1.gain.setValueAtTime(0.28, t);
+        g1.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+        o1.connect(g1); g1.connect(ctx.destination);
+        o1.start(t); o1.stop(t + 0.04);
+
+        // Confirmation ping: triangle, higher pitch, longer tail
+        const o2 = ctx.createOscillator();
+        const g2 = ctx.createGain();
+        o2.type = 'triangle';
+        o2.frequency.setValueAtTime(1480, t + 0.01);
+        g2.gain.setValueAtTime(0.0, t);
+        g2.gain.linearRampToValueAtTime(0.35, t + 0.02);
+        g2.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        o2.connect(g2); g2.connect(ctx.destination);
+        o2.start(t + 0.01); o2.stop(t + 0.22);
+      },
       chaChing: (ctx, t) => {
         const o1 = ctx.createOscillator();
         const g1 = ctx.createGain();

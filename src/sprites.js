@@ -298,6 +298,100 @@ function drawGasPump(ctx) {
   ctx.fillRect(6 * PX, 31 * PX, 20 * PX, 1 * PX);
 }
 
+function drawGasPumpUpgraded(ctx) {
+  // 64×64 sprite (32 logical px @ PX=2). Two pump bodies side by side
+  // under a shared sign/canopy. Left nozzle faces left, right faces right.
+
+  // Shared canopy pole (center)
+  ctx.fillStyle = '#3a3f4a';
+  ctx.fillRect(14 * PX, 2 * PX, 4 * PX, 6 * PX);
+
+  // Shared sign board
+  ctx.fillStyle = '#d34d4d';
+  ctx.fillRect(1 * PX, 1 * PX, 30 * PX, 6 * PX);
+  ctx.fillStyle = '#a93a1c';
+  ctx.fillRect(1 * PX, 6 * PX, 30 * PX, 1 * PX);
+
+  // "GAS" text
+  ctx.fillStyle = '#ffffff';
+  // G
+  ctx.fillRect(6 * PX, 3 * PX, 3 * PX, 1 * PX);
+  ctx.fillRect(6 * PX, 4 * PX, 1 * PX, 2 * PX);
+  ctx.fillRect(6 * PX, 5 * PX, 3 * PX, 1 * PX);
+  ctx.fillRect(8 * PX, 4 * PX, 1 * PX, 1 * PX);
+  // A
+  ctx.fillRect(11 * PX, 4 * PX, 1 * PX, 2 * PX);
+  ctx.fillRect(13 * PX, 4 * PX, 1 * PX, 2 * PX);
+  ctx.fillRect(12 * PX, 3 * PX, 1 * PX, 2 * PX);
+  // S
+  ctx.fillRect(16 * PX, 3 * PX, 3 * PX, 1 * PX);
+  ctx.fillRect(16 * PX, 4 * PX, 1 * PX, 1 * PX);
+  ctx.fillRect(16 * PX, 5 * PX, 3 * PX, 1 * PX);
+  ctx.fillRect(18 * PX, 4 * PX, 1 * PX, 1 * PX);
+
+  // Left pump body (x=2..11)
+  ctx.fillStyle = '#f0a13a';
+  ctx.fillRect(2 * PX, 10 * PX, 10 * PX, 20 * PX);
+  ctx.fillStyle = '#a85f15';
+  ctx.fillRect(2 * PX, 10 * PX, 10 * PX, 1 * PX);
+  ctx.fillRect(2 * PX, 29 * PX, 10 * PX, 1 * PX);
+  ctx.fillRect(10 * PX, 10 * PX, 2 * PX, 20 * PX);
+  ctx.fillStyle = '#ffd166';
+  ctx.fillRect(3 * PX, 11 * PX, 1 * PX, 18 * PX);
+  // Left pump display
+  ctx.fillStyle = '#1a2233';
+  ctx.fillRect(4 * PX, 13 * PX, 6 * PX, 5 * PX);
+  ctx.fillStyle = '#7df5b2';
+  ctx.fillRect(5 * PX, 14 * PX, 4 * PX, 1 * PX);
+  ctx.fillRect(5 * PX, 16 * PX, 3 * PX, 1 * PX);
+  // Left nozzle (faces left)
+  ctx.fillStyle = '#2a2d36';
+  ctx.fillRect(0 * PX, 14 * PX, 2 * PX, 2 * PX);
+  ctx.fillStyle = '#1c1e25';
+  ctx.fillRect(0 * PX, 14 * PX, 1 * PX, 4 * PX);
+  ctx.fillRect(0 * PX, 18 * PX, 2 * PX, 1 * PX);
+  ctx.fillRect(1 * PX, 19 * PX, 1 * PX, 4 * PX);
+  ctx.fillStyle = '#5a5f6b';
+  ctx.fillRect(0 * PX, 22 * PX, 2 * PX, 3 * PX);
+  // Left base
+  ctx.fillStyle = '#3a3f4a';
+  ctx.fillRect(1 * PX, 30 * PX, 12 * PX, 2 * PX);
+  ctx.fillStyle = '#2a2d36';
+  ctx.fillRect(1 * PX, 31 * PX, 12 * PX, 1 * PX);
+
+  // Right pump body (x=20..29)
+  ctx.fillStyle = '#f0a13a';
+  ctx.fillRect(20 * PX, 10 * PX, 10 * PX, 20 * PX);
+  ctx.fillStyle = '#a85f15';
+  ctx.fillRect(20 * PX, 10 * PX, 10 * PX, 1 * PX);
+  ctx.fillRect(20 * PX, 29 * PX, 10 * PX, 1 * PX);
+  ctx.fillRect(28 * PX, 10 * PX, 2 * PX, 20 * PX);
+  ctx.fillStyle = '#ffd166';
+  ctx.fillRect(21 * PX, 11 * PX, 1 * PX, 18 * PX);
+  // Right pump display
+  ctx.fillStyle = '#1a2233';
+  ctx.fillRect(22 * PX, 13 * PX, 6 * PX, 5 * PX);
+  ctx.fillStyle = '#7df5b2';
+  ctx.fillRect(23 * PX, 14 * PX, 4 * PX, 1 * PX);
+  ctx.fillRect(23 * PX, 16 * PX, 3 * PX, 1 * PX);
+  // Right nozzle (faces right)
+  ctx.fillStyle = '#2a2d36';
+  ctx.fillRect(30 * PX, 14 * PX, 2 * PX, 2 * PX);
+  ctx.fillStyle = '#1c1e25';
+  ctx.fillRect(31 * PX, 14 * PX, 1 * PX, 4 * PX);
+  ctx.fillRect(30 * PX, 18 * PX, 2 * PX, 1 * PX);
+  ctx.fillRect(30 * PX, 19 * PX, 1 * PX, 4 * PX);
+  ctx.fillStyle = '#5a5f6b';
+  ctx.fillRect(30 * PX, 22 * PX, 2 * PX, 3 * PX);
+  ctx.fillStyle = '#3a3f4a';
+  ctx.fillRect(25 * PX, 23 * PX, 1 * PX, 2 * PX);
+  // Right base
+  ctx.fillStyle = '#3a3f4a';
+  ctx.fillRect(19 * PX, 30 * PX, 12 * PX, 2 * PX);
+  ctx.fillStyle = '#2a2d36';
+  ctx.fillRect(19 * PX, 31 * PX, 12 * PX, 1 * PX);
+}
+
 function drawOreShack(ctx) {
   // 192×64 canvas, logical 96×32 @ PX=2
   rect(ctx, 0, 0, 96, 32, '#6b4a2a');
@@ -356,6 +450,66 @@ function drawOreStorage(ctx) {
   px(ctx, 29,  9, '#1c2030');
   px(ctx,  2, 29, '#1c2030');
   px(ctx, 29, 29, '#1c2030');
+}
+
+function drawOreStorageUpgraded(ctx) {
+  // 64×64 canvas, logical 32×32 @ PX=2 — high-throughput industrial ore processor
+  rect(ctx, 0, 0, 32, 32, '#1e2435');
+  rect(ctx, 1, 1, 30, 30, '#2a3248');
+
+  // Outer frame
+  rect(ctx,  0,  0, 32,  1, '#6a7a8a');
+  rect(ctx,  0,  0,  1, 32, '#6a7a8a');
+  rect(ctx, 31,  0,  1, 32, '#0e1020');
+  rect(ctx,  0, 31, 32,  1, '#0e1020');
+
+  // Yellow label strip (same "ORE" motif as base storage)
+  rect(ctx, 2, 2, 28, 6, '#ffd166');
+  rect(ctx, 2, 2, 28, 1, '#ffe899');
+  rect(ctx, 2, 7, 28, 1, '#c8a030');
+  rect(ctx,  4, 4, 4, 2, '#3a2a00');
+  rect(ctx, 10, 4, 4, 2, '#3a2a00');
+  rect(ctx, 16, 4, 4, 2, '#3a2a00');
+
+  // Cyan accent bar below label
+  rect(ctx, 2, 8, 28, 1, '#00a8cc');
+
+  // Processing display panel
+  rect(ctx, 2, 10, 28, 9, '#0a0f1a');
+  rect(ctx, 2, 10, 28, 1, '#003a50');
+  // Bar-graph inside display (5 bars of varying height, cyan tones)
+  for (let i = 0; i < 5; i++) {
+    const barH = [6, 4, 7, 5, 8][i];
+    rect(ctx, 4 + i * 5, 10 + (8 - barH), 3, barH, i % 2 === 0 ? '#00ccff' : '#0099cc');
+  }
+  // Green status LEDs top-right of panel
+  px(ctx, 28, 11, '#00dd88');
+  px(ctx, 29, 11, '#00dd88');
+
+  // Divider
+  rect(ctx, 2, 19, 28, 1, '#003a50');
+
+  // Conveyor belt section
+  rect(ctx, 2, 20, 28, 10, '#151c28');
+  // Roller cylinders
+  for (let lx = 3; lx < 29; lx += 4) {
+    rect(ctx, lx, 21, 2, 9, '#2a3248');
+    rect(ctx, lx, 21, 2,  1, '#4a5568');
+  }
+  // Belt surface with diagonal stripe texture
+  rect(ctx, 3, 22, 26, 7, '#1e2838');
+  for (let i = 0; i < 7; i++) {
+    const bx = 3 + i * 4;
+    if (bx < 28) rect(ctx, bx, 22, 2, 7, '#263040');
+  }
+  // Cyan glow at belt bottom edge
+  rect(ctx, 2, 29, 28, 1, '#00a8cc');
+
+  // Corner bolts
+  px(ctx,  2,  9, '#0e1020');
+  px(ctx, 29,  9, '#0e1020');
+  px(ctx,  2, 19, '#0e1020');
+  px(ctx, 29, 19, '#0e1020');
 }
 
 function drawOrePad(ctx) {
@@ -564,6 +718,80 @@ function drawRepairGarage(ctx) {
   rect(ctx, 0, 0, 64, 1, '#8090a0');
 }
 
+function drawRepairGarageUpgraded(ctx) {
+  // 128×64 canvas, logical 64×32 @ PX=2 — enhanced repair bay with three hooks and energy floor
+  rect(ctx, 0, 0, 64, 32, '#080c14');
+
+  // Left pillar
+  rect(ctx, 0, 0, 6, 32, '#3a4055');
+  rect(ctx, 0, 0, 1, 32, '#7a8590');
+  rect(ctx, 5, 0, 1, 32, '#1a1e2a');
+  rect(ctx, 1, 8,  4, 1, '#1a1e2a');
+  rect(ctx, 1, 18, 4, 1, '#1a1e2a');
+  px(ctx, 2, 2,  '#7a8a9a'); px(ctx, 4, 2,  '#7a8a9a');
+  px(ctx, 2, 28, '#7a8a9a'); px(ctx, 4, 28, '#7a8a9a');
+  rect(ctx, 3, 4,  1, 3, '#00ccee');
+  rect(ctx, 3, 13, 1, 4, '#00ccee');
+  rect(ctx, 3, 21, 1, 4, '#00ccee');
+
+  // Right pillar
+  rect(ctx, 58, 0, 6, 32, '#3a4055');
+  rect(ctx, 58, 0, 1, 32, '#7a8590');
+  rect(ctx, 63, 0, 1, 32, '#1a1e2a');
+  rect(ctx, 58, 8,  5, 1, '#1a1e2a');
+  rect(ctx, 58, 18, 5, 1, '#1a1e2a');
+  px(ctx, 59, 2,  '#7a8a9a'); px(ctx, 61, 2,  '#7a8a9a');
+  px(ctx, 59, 28, '#7a8a9a'); px(ctx, 61, 28, '#7a8a9a');
+  rect(ctx, 60, 4,  1, 3, '#00ccee');
+  rect(ctx, 60, 13, 1, 4, '#00ccee');
+  rect(ctx, 60, 21, 1, 4, '#00ccee');
+  // Upgraded control panel — more LEDs
+  rect(ctx, 58, 9, 5, 8, '#0a0d14');
+  px(ctx, 59, 11, '#00dd88'); px(ctx, 61, 11, '#00dd88');
+  px(ctx, 59, 13, '#00ccff'); px(ctx, 61, 13, '#00ccff');
+  px(ctx, 59, 15, '#ffd166'); px(ctx, 61, 15, '#ffd166');
+  rect(ctx, 59, 17, 3, 1, '#3a4050');
+
+  // Overhead beam with dual-rail track
+  rect(ctx, 6, 0, 52, 3, '#252a38');
+  rect(ctx, 6, 0, 52, 1, '#7a8a9a');
+  rect(ctx, 8, 1, 48, 1, '#3a4050');
+  rect(ctx, 8, 2, 48, 1, '#4a5568');
+
+  // Bay interior
+  rect(ctx, 6, 3, 52, 24, '#080c14');
+  rect(ctx, 8,  3, 48, 1, '#007080');
+  rect(ctx, 12, 3, 40, 1, '#009aaa');
+  rect(ctx, 8, 10, 48, 1, '#141720');
+  rect(ctx, 8, 18, 48, 1, '#141720');
+
+  // Three hooks
+  rect(ctx, 16, 3, 1, 9, '#4a5060'); rect(ctx, 16, 3, 1, 1, '#8a9aaa');
+  rect(ctx, 16, 12, 4, 1, '#4a5060'); rect(ctx, 19, 12, 1, 3, '#4a5060');
+  rect(ctx, 16, 14, 3, 1, '#3a4050');
+
+  rect(ctx, 31, 3, 1, 8, '#4a5060'); rect(ctx, 31, 3, 1, 1, '#8a9aaa');
+  rect(ctx, 31, 11, 4, 1, '#4a5060'); rect(ctx, 34, 11, 1, 3, '#4a5060');
+  rect(ctx, 31, 13, 3, 1, '#3a4050');
+
+  rect(ctx, 46, 3, 1, 9, '#4a5060'); rect(ctx, 46, 3, 1, 1, '#8a9aaa');
+  rect(ctx, 46, 12, 4, 1, '#4a5060'); rect(ctx, 49, 12, 1, 3, '#4a5060');
+  rect(ctx, 46, 14, 3, 1, '#3a4050');
+
+  // Horizontal energy scan line mid-bay
+  rect(ctx, 8, 20, 48, 1, '#003a50');
+  rect(ctx, 10, 20, 44, 1, '#006888');
+
+  // Repair floor platform with bright energy glow
+  rect(ctx, 6,  27, 52, 1, '#005a6a');
+  rect(ctx, 8,  28, 48, 1, '#00aacc');
+  rect(ctx, 6,  29, 52, 3, '#1a2230');
+  for (let lx = 10; lx < 57; lx += 7) rect(ctx, lx, 29, 1, 3, '#222a38');
+
+  // Top edge highlight
+  rect(ctx, 0, 0, 64, 1, '#a0b8c8');
+}
+
 function drawCreditShack(ctx) {
   // 160×64 canvas, logical 80×32 @ PX=2 — dilapidated shack with faded coin motif
   rect(ctx, 0, 0, 80, 32, '#6b4a2a');
@@ -670,12 +898,15 @@ export function buildSprites() {
     tiles: {},
     digger: {},
     gasPump: null,
+    gasPumpUpgraded: null,
     spawnFlag: null,
     oreShack: null,
     oreStorage: null,
+    oreStorageUpgraded: null,
     orePad: null,
     repairShack: null,
     repairGarage: null,
+    repairGarageUpgraded: null,
     upgradeShack: null,
     upgradeLab: null,
     creditShack: null,
@@ -727,6 +958,13 @@ export function buildSprites() {
   drawGasPump(pumpCtx);
   sprites.gasPump = pumpC;
 
+  // Upgraded gas pump — two pumps side by side (64×64)
+  const pumpUpC = makeCanvas(64);
+  const pumpUpCtx = pumpUpC.getContext('2d');
+  pumpUpCtx.imageSmoothingEnabled = false;
+  drawGasPumpUpgraded(pumpUpCtx);
+  sprites.gasPumpUpgraded = pumpUpC;
+
   // Ore shack (192×64, 96×32 logical @ PX=2)
   const shackC = document.createElement('canvas');
   shackC.width = 192; shackC.height = 64;
@@ -741,6 +979,13 @@ export function buildSprites() {
   storageCtx.imageSmoothingEnabled = false;
   drawOreStorage(storageCtx);
   sprites.oreStorage = storageC;
+
+  // Upgraded ore storage (64×64, 32×32 logical @ PX=2)
+  const storageUpC = makeCanvas(64);
+  const storageUpCtx = storageUpC.getContext('2d');
+  storageUpCtx.imageSmoothingEnabled = false;
+  drawOreStorageUpgraded(storageUpCtx);
+  sprites.oreStorageUpgraded = storageUpC;
 
   // Landing pad (128×64, 64×32 logical @ PX=2)
   const padC = document.createElement('canvas');
@@ -765,6 +1010,14 @@ export function buildSprites() {
   repairGarageCtx.imageSmoothingEnabled = false;
   drawRepairGarage(repairGarageCtx);
   sprites.repairGarage = repairGarageC;
+
+  // Upgraded repair garage (128×64, 64×32 logical @ PX=2)
+  const repairGarageUpC = document.createElement('canvas');
+  repairGarageUpC.width = 128; repairGarageUpC.height = 64;
+  const repairGarageUpCtx = repairGarageUpC.getContext('2d');
+  repairGarageUpCtx.imageSmoothingEnabled = false;
+  drawRepairGarageUpgraded(repairGarageUpCtx);
+  sprites.repairGarageUpgraded = repairGarageUpC;
 
   // Upgrade shack (160×64, 80×32 logical @ PX=2)
   const upgradeShackC = document.createElement('canvas');

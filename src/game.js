@@ -358,7 +358,8 @@ export class Game {
       if (!overlaps) continue;
 
       this.refuelingStation = gs;
-      if (this.input.down('f') && this.digger.money > 0) {
+      const fuelBefore = this.digger.fuel;
+      if (this.input.down('f') && this.digger.money > 0 && !this._fuelClickPlayed) {
         const refuelRate = REFUEL_RATE * (this.creditShop.gasUpgraded ? 4 : 1);
         const gasPriceUnit = GAS_PRICE_PER_UNIT * (this.creditShop.gasUpgraded ? 1.2 : 1);
         const maxWant = refuelRate * dt;
@@ -380,6 +381,12 @@ export class Game {
           this._refuelSoundTimer = 0;
         }
       }
+      if (this.input.down('f') && this.digger.fuel >= this.digger.maxFuel && fuelBefore < this.digger.maxFuel && !this._fuelClickPlayed) {
+        this._refuelSoundTimer = 0.18;
+        this.audio.play('click');
+        this._fuelClickPlayed = true;
+      }
+      if (!this.input.down('f')) this._fuelClickPlayed = false;
       break;
     }
 
@@ -387,6 +394,7 @@ export class Game {
       this.fuelBought = 0;
       this.fuelBoughtTimer = 0;
       this._refuelSoundTimer = 0;
+      this._fuelClickPlayed = false;
     }
   }
 
@@ -589,17 +597,7 @@ export class Game {
       // Cull off-screen stations
       if (sx + r.w < 0 || sy + r.h < 0 || sx > cam.viewW || sy > cam.viewH) continue;
 
-      ctx.drawImage(this.sprites.gasPump, sx, sy);
-
-      if (this.creditShop.gasUpgraded) {
-        ctx.save();
-        ctx.globalAlpha = 0.55;
-        ctx.fillStyle = '#00ffcc';
-        ctx.fillRect(sx + 6, sy + 4, 20, 3);
-        ctx.fillStyle = '#ff66cc';
-        ctx.fillRect(sx + 6, sy + 8, 20, 2);
-        ctx.restore();
-      }
+      ctx.drawImage(this.creditShop.gasUpgraded ? this.sprites.gasPumpUpgraded : this.sprites.gasPump, sx, sy);
 
       if (this.refuelingStation === gs) {
         const cx = sx + r.w / 2;
@@ -889,7 +887,7 @@ export class Game {
         this._renderProgressBar(ctx, sx, sy, spw, depot.buildTimer / BUILD_DURATION);
       }
     } else {
-      ctx.drawImage(this.sprites.oreStorage, sx, sy);
+      ctx.drawImage(this.creditShop.oreUpgraded ? this.sprites.oreStorageUpgraded : this.sprites.oreStorage, sx, sy);
       ctx.drawImage(this.sprites.orePad, sx + 2 * TILE_SIZE, sy);
       this._renderOreSquares(ctx, sx, sy);
       if (this.creditShop.oreUpgraded) {
@@ -1230,7 +1228,7 @@ export class Game {
         this._renderProgressBar(ctx, sx, sy, spw, shop.buildTimer / BUILD_DURATION);
       }
     } else {
-      ctx.drawImage(this.sprites.repairGarage, sx, sy);
+      ctx.drawImage(this.creditShop.repairUpgraded ? this.sprites.repairGarageUpgraded : this.sprites.repairGarage, sx, sy);
       if (this.creditShop.repairUpgraded) {
         const craneX = sx + shop.w * TILE_SIZE + 2;
         ctx.fillStyle = '#4a5060';
