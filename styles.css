@@ -92,6 +92,17 @@ html, body {
 }
 #hud .fill.low { animation: blink-low 0.55s ease-in-out infinite; }
 #hud .bar.low  { animation: blink-border-low 0.55s ease-in-out infinite; }
+
+@keyframes blink-cargo-high {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.15; }
+}
+@keyframes blink-border-cargo-high {
+  0%, 100% { border-color: #2a3142; }
+  50%       { border-color: rgba(74, 144, 217, 0.9); }
+}
+#hud .fill.cargo-high { animation: blink-cargo-high 0.55s ease-in-out infinite; }
+#hud .bar.cargo-high  { animation: blink-border-cargo-high 0.55s ease-in-out infinite; }
 #hud .fill.cargo { background: linear-gradient(90deg, #4a90d9, #7ec8e3); }
 #hud .fill.money { background: linear-gradient(90deg, #2d7a3a, #6fcf5a); }
 
