@@ -59,6 +59,19 @@ export class AudioManager {
         osc.connect(gain); gain.connect(ctx.destination);
         osc.start(t); osc.stop(t + 0.12);
       },
+      oreDrop: (ctx, t) => {
+        // Soft thump/raindrop: sine sweep 220→55 Hz, quick attack, fast decay
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, t);
+        osc.frequency.exponentialRampToValueAtTime(55, t + 0.15);
+        gain.gain.setValueAtTime(0.0, t);
+        gain.gain.linearRampToValueAtTime(0.38, t + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.18);
+      },
       chaChing: (ctx, t) => {
         const o1 = ctx.createOscillator();
         const g1 = ctx.createGain();
