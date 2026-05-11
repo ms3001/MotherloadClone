@@ -634,7 +634,7 @@ export class Game {
     facility.constructSoundTimer = (facility.constructSoundTimer ?? 0) - dt;
     if (facility.constructSoundTimer <= 0) {
       this.audio.play('construct');
-      facility.constructSoundTimer = 1.1;
+      facility.constructSoundTimer = 3.33;
     }
     if (facility.buildTimer >= BUILD_DURATION) {
       facility.buildTimer = BUILD_DURATION;
@@ -710,6 +710,7 @@ export class Game {
           if (units > 0) {
             depot.sellAccum -= units;
             this._transferOreToDepot(units);
+            this.audio.play('oreDrop');
           }
         } else if (!this.input.down('f')) {
           depot.sellAccum = 0;
@@ -1292,6 +1293,7 @@ export class Game {
     d.money = Math.max(0, d.money - (next.credits ?? 0));
     d.attachments[slot] = next;
     d._applyAttachmentStats();
+    if (slot === 'hull') d.hull = d.maxHull;
     lab.buyFlash = { row: rowIdx, timer: 0.7 };
   }
 
