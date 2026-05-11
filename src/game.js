@@ -1340,11 +1340,11 @@ export class Game {
     let label, color, sub, subColor;
     if (lab.state === 'shack') {
       if (lab.flashTimer > 0) { label = lab.flashMsg; color = '#e63946'; }
-      else { label = '[F] BUILD UPGRADE LAB'; color = '#ffd166'; sub = `${LAB_COPPER_COST} copper  +  ${LAB_IRON_COST} iron  +  $${LAB_CREDIT_COST}`; subColor = '#c8a030'; }
+      else { label = '[F] BUILD DRILL SHOP'; color = '#ffd166'; sub = `${LAB_COPPER_COST} copper  +  ${LAB_IRON_COST} iron  +  $${LAB_CREDIT_COST}`; subColor = '#c8a030'; }
     } else if (lab.state === 'constructing') {
       label = 'CONSTRUCTING...'; color = '#a8e6a0';
     } else {
-      label = '[F] UPGRADE SHOP'; color = '#a0c8ff';
+      label = '[F] DRILL SHOP'; color = '#a0c8ff';
     }
 
     if (sub) { this._drawLabel(ctx, sub, cx, cy, subColor); cy -= 16; }
@@ -1448,7 +1448,7 @@ export class Game {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#a0c8ff';
-    ctx.fillText('UPGRADE FACILITY', px + PW / 2, py + 18);
+    ctx.fillText('DRILL SHOP', px + PW / 2, py + 18);
 
     ctx.font = '10px ui-monospace, monospace';
     ctx.fillStyle = '#4a6a8a';
