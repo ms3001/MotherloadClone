@@ -564,6 +564,107 @@ function drawRepairGarage(ctx) {
   rect(ctx, 0, 0, 64, 1, '#8090a0');
 }
 
+function drawCreditShack(ctx) {
+  // 160×64 canvas, logical 80×32 @ PX=2 — dilapidated shack with faded coin motif
+  rect(ctx, 0, 0, 80, 32, '#6b4a2a');
+  for (let lx = 8; lx < 80; lx += 8) rect(ctx, lx, 0, 1, 32, '#3a2010');
+  // Asymmetric peaked roof, peak at x=40
+  for (let row = 0; row < 10; row++) {
+    const lx = Math.max(0, Math.round(40 - row * 4.0));
+    const rr = Math.min(80, Math.round(40 + row * 2.5));
+    rect(ctx, lx, row, rr - lx, 1, row % 2 === 0 ? '#3a2010' : '#5a3a1a');
+  }
+  rect(ctx, 38, 0, 4, 1, '#7a5830');
+  rect(ctx, 0, 10, 80, 2, '#3a2010');
+  // Broken window left
+  rect(ctx, 6, 14, 10, 9, '#0a0810');
+  rect(ctx, 6, 14, 1, 9, '#3a2010');
+  rect(ctx, 6, 14, 10, 1, '#3a2010');
+  rect(ctx, 10, 14, 1, 5, '#2a1a10');
+  // Faded "$" sign in window — two horizontal bars + vertical stroke
+  rect(ctx, 7, 16, 7, 1, '#3a2a0a');
+  rect(ctx, 7, 19, 7, 1, '#3a2a0a');
+  rect(ctx, 10, 15, 1, 6, '#3a2a0a');
+  // Broken window right
+  rect(ctx, 60, 14, 10, 9, '#0a0810');
+  rect(ctx, 60, 14, 1, 9, '#3a2010');
+  rect(ctx, 60, 14, 10, 1, '#3a2010');
+  rect(ctx, 65, 14, 1, 5, '#2a1a10');
+  rect(ctx, 61, 17, 4, 1, '#2a1a10');
+  // Central door
+  rect(ctx, 36, 20, 8, 12, '#0d0a08');
+  rect(ctx, 36, 18, 8, 2, '#3a2010');
+  rect(ctx, 36, 18, 1, 14, '#3a2010');
+  rect(ctx, 43, 18, 1, 14, '#3a2010');
+  // Weathering
+  rect(ctx,  3, 18, 2, 1, '#2a1a0a');
+  rect(ctx, 28, 25, 3, 1, '#2a1a0a');
+  rect(ctx, 70, 20, 1, 2, '#2a1a0a');
+  rect(ctx, 18, 28, 4, 1, '#2a1a0a');
+}
+
+function drawCreditStore(ctx) {
+  // 160×64 canvas, logical 80×32 @ PX=2 — gilded storefront
+  rect(ctx, 0, 0, 80, 32, '#1a1208');
+  // Façade base: warm dark gold
+  rect(ctx, 0, 0, 80, 32, '#2a1e08');
+  // Top molding band (gold)
+  rect(ctx, 0, 0, 80, 4, '#b8860b');
+  rect(ctx, 0, 0, 80, 1, '#ffe899');
+  rect(ctx, 0, 3, 80, 1, '#8a6208');
+  // Mid-height molding
+  rect(ctx, 0, 14, 80, 2, '#b8860b');
+  rect(ctx, 0, 14, 80, 1, '#ffd166');
+  rect(ctx, 0, 15, 80, 1, '#8a6208');
+  // Left column
+  rect(ctx, 0, 0, 7, 32, '#b8860b');
+  rect(ctx, 0, 0, 1, 32, '#ffe899');
+  rect(ctx, 6, 0, 1, 32, '#8a6208');
+  rect(ctx, 2, 6, 3, 1, '#8a6208');
+  rect(ctx, 2, 14, 3, 1, '#8a6208');
+  rect(ctx, 2, 22, 3, 1, '#8a6208');
+  // Right column
+  rect(ctx, 73, 0, 7, 32, '#b8860b');
+  rect(ctx, 73, 0, 1, 32, '#ffe899');
+  rect(ctx, 79, 0, 1, 32, '#8a6208');
+  rect(ctx, 74, 6, 3, 1, '#8a6208');
+  rect(ctx, 74, 14, 3, 1, '#8a6208');
+  rect(ctx, 74, 22, 3, 1, '#8a6208');
+  // Display window — large bright glow
+  rect(ctx, 10, 5, 28, 22, '#8a6208');
+  rect(ctx, 11, 6, 26, 20, '#fff9e0');
+  rect(ctx, 11, 6, 26, 3, '#fffdf5');
+  rect(ctx, 11, 6, 3, 20, '#fffdf5');
+  // Gold coin stack above window
+  rect(ctx, 20, 3, 8, 2, '#ffd166');
+  rect(ctx, 21, 2, 6, 1, '#ffd166');
+  rect(ctx, 22, 1, 4, 1, '#ffe899');
+  rect(ctx, 23, 1, 2, 1, '#fff9cc');
+  // "$" sign in window center
+  rect(ctx, 22, 10, 6, 1, '#b8860b');
+  rect(ctx, 22, 13, 6, 1, '#b8860b');
+  rect(ctx, 24, 8, 1, 8, '#b8860b');
+  // Right display window
+  rect(ctx, 42, 5, 28, 22, '#8a6208');
+  rect(ctx, 43, 6, 26, 20, '#fff9e0');
+  rect(ctx, 43, 6, 26, 3, '#fffdf5');
+  rect(ctx, 43, 6, 3, 20, '#fffdf5');
+  // Second coin stack
+  rect(ctx, 52, 3, 8, 2, '#ffd166');
+  rect(ctx, 53, 2, 6, 1, '#ffd166');
+  // Door between columns
+  rect(ctx, 37, 18, 6, 14, '#1a1208');
+  rect(ctx, 37, 16, 6, 2, '#b8860b');
+  rect(ctx, 37, 16, 1, 16, '#b8860b');
+  rect(ctx, 42, 16, 1, 16, '#b8860b');
+  // Door knob
+  rect(ctx, 39, 24, 1, 1, '#ffd166');
+  // Top edge highlight
+  rect(ctx, 0, 0, 80, 1, '#ffe899');
+  // Floor line
+  rect(ctx, 0, 31, 80, 1, '#8a6208');
+}
+
 export function buildSprites() {
   const sprites = {
     tiles: {},
@@ -577,6 +678,8 @@ export function buildSprites() {
     repairGarage: null,
     upgradeShack: null,
     upgradeLab: null,
+    creditShack: null,
+    creditStore: null,
   };
 
   // Tile sprites
@@ -678,6 +781,22 @@ export function buildSprites() {
   upgradeLabCtx.imageSmoothingEnabled = false;
   drawUpgradeLab(upgradeLabCtx);
   sprites.upgradeLab = upgradeLabC;
+
+  // Credit shack (160×64, 80×32 logical @ PX=2)
+  const creditShackC = document.createElement('canvas');
+  creditShackC.width = 160; creditShackC.height = 64;
+  const creditShackCtx = creditShackC.getContext('2d');
+  creditShackCtx.imageSmoothingEnabled = false;
+  drawCreditShack(creditShackCtx);
+  sprites.creditShack = creditShackC;
+
+  // Credit store (160×64, 80×32 logical @ PX=2)
+  const creditStoreC = document.createElement('canvas');
+  creditStoreC.width = 160; creditStoreC.height = 64;
+  const creditStoreCtx = creditStoreC.getContext('2d');
+  creditStoreCtx.imageSmoothingEnabled = false;
+  drawCreditStore(creditStoreCtx);
+  sprites.creditStore = creditStoreC;
 
   // Digger variants — index by [facing][stateKey][frame]
   const DIGGER_STATES = [
