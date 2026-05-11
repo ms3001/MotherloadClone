@@ -202,7 +202,8 @@ export class Game {
       return;
     }
 
-    const digInput = this.upgradeLab.panelOpen
+    const blockWS = this.upgradeLab.panelOpen || this.inventory.visible;
+    const digInput = blockWS
       ? { down: k => (k === 'w' || k === 's') ? false : this.input.down(k), pressed: k => this.input.pressed(k) }
       : this.input;
     this.digger.update(dt, digInput);
@@ -231,6 +232,10 @@ export class Game {
     if (this.input.pressed('tab')) {
       if (this.upgradeLab.panelOpen) this.upgradeLab.panelOpen = false;
       else this.inventory.toggle();
+    }
+    if (this.inventory.visible) {
+      if (this.input.pressed('w')) this.inventory.navigate(this.digger, -1);
+      if (this.input.pressed('s')) this.inventory.navigate(this.digger,  1);
     }
     const tabHeld = this.input.down('f') && this.inventory.visible;
     this._tabHoldTimer = tabHeld ? (this._tabHoldTimer ?? 0) + dt : 0;
@@ -783,10 +788,10 @@ export class Game {
     const d = this.digger;
     const depot = this.oreDepot;
     let remaining = units;
-    for (const [key, count] of d.cargo) {
-      if (remaining <= 0) break;
+    const xfer = (key, count) => {
+      if (remaining <= 0) return;
       const ore = ORE_BY_KEY.get(key);
-      if (!ore) continue;
+      if (!ore) return;
       const transfer = Math.min(count, remaining);
       const newCount = count - transfer;
       if (newCount === 0) d.cargo.delete(key);
@@ -794,6 +799,12 @@ export class Game {
       d.cargoUsed = Math.max(0, d.cargoUsed - transfer * ore.weight);
       depot.stockpile.set(key, (depot.stockpile.get(key) ?? 0) + transfer);
       remaining -= transfer;
+    };
+    const pk = this.inventory.priorityKey;
+    if (pk && d.cargo.has(pk)) xfer(pk, d.cargo.get(pk));
+    for (const [key, count] of [...d.cargo]) {
+      if (key === pk) continue;
+      xfer(key, count);
     }
   }
 

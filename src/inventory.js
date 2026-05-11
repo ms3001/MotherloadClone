@@ -33,6 +33,7 @@ export class Inventory {
 
     this._resetProgress = document.getElementById('inv-reset-progress');
     this._resetLabel    = document.getElementById('inv-reset-label');
+    this.priorityKey    = null;
   }
 
   toggle() {
@@ -48,7 +49,17 @@ export class Inventory {
     this._resetLabel.textContent = tabHoldFrac > 0 ? 'Hold [F] to reset...' : 'Hold [F] to reset save';
   }
 
+  navigate(digger, dir) {
+    const keys = [...digger.cargo.keys()];
+    if (keys.length === 0) { this.priorityKey = null; return; }
+    let idx = keys.indexOf(this.priorityKey);
+    idx = idx === -1 ? (dir > 0 ? 0 : keys.length - 1)
+                     : (idx + dir + keys.length) % keys.length;
+    this.priorityKey = keys[idx];
+  }
+
   _updateCargo(digger) {
+    if (this.priorityKey && !digger.cargo.has(this.priorityKey)) this.priorityKey = null;
     let html = '';
     let totalValue = 0;
     for (const [key, count] of digger.cargo) {
@@ -56,10 +67,11 @@ export class Inventory {
       if (!ore) continue;
       const value = ore.value * count;
       totalValue += value;
+      const priority = key === this.priorityKey;
       html +=
         `<div class="inv-row">` +
         `<div class="inv-swatch" style="background:${ore.color}"></div>` +
-        `<span class="inv-name">${ore.name}</span>` +
+        `<span class="inv-name" style="${priority ? 'text-decoration:underline' : ''}">${ore.name}</span>` +
         `<span class="inv-count">\xd7${count}</span>` +
         `<span class="inv-weight">${ore.weight * count} wt</span>` +
         `<span class="inv-value">$${value}</span>` +
